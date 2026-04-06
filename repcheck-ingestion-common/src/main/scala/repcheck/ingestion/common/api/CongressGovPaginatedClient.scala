@@ -3,6 +3,7 @@ package repcheck.ingestion.common.api
 import scala.concurrent.duration.FiniteDuration
 
 import cats.effect.Temporal
+
 import fs2.Stream
 
 trait CongressGovPaginatedClient[F[_], T] {

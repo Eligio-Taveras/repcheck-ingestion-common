@@ -1,9 +1,10 @@
 package repcheck.ingestion.common.logging
 
-import cats.effect.Sync
-
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+
+import cats.effect.Sync
+
 import io.circe.Json
 
 object PipelineLoggerFactory {

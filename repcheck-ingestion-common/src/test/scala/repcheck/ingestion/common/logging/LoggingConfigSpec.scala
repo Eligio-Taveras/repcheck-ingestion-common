@@ -1,9 +1,9 @@
 package repcheck.ingestion.common.logging
 
+import pureconfig.{ConfigReader, ConfigSource}
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import pureconfig.ConfigReader
-import pureconfig.ConfigSource
 
 class LoggingConfigSpec extends AnyFlatSpec with Matchers {
 

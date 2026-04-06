@@ -3,6 +3,7 @@ package repcheck.ingestion.common.codecs
 import java.time.ZonedDateTime
 
 import io.circe.syntax._
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 

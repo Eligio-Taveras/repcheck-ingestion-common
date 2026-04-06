@@ -2,9 +2,10 @@ package repcheck.ingestion.common.api
 
 import scala.concurrent.duration._
 
+import pureconfig.ConfigSource
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import pureconfig.ConfigSource
 
 class HttpClientConfigSpec extends AnyFlatSpec with Matchers {
 

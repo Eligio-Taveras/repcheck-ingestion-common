@@ -1,8 +1,9 @@
 package repcheck.ingestion.common.xml
 
+import pureconfig.ConfigSource
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import pureconfig.ConfigSource
 
 class XmlFeedConfigSpec extends AnyFlatSpec with Matchers {
 

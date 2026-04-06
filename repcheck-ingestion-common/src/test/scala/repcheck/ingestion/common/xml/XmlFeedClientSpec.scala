@@ -2,11 +2,13 @@ package repcheck.ingestion.common.xml
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+
+import org.http4s.ember.client.EmberClientBuilder
+
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import com.github.tomakehurst.wiremock.stubbing.Scenario
-import org.http4s.ember.client.EmberClientBuilder
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

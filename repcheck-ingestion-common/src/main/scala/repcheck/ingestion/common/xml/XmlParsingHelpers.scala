@@ -1,7 +1,7 @@
 package repcheck.ingestion.common.xml
 
-import java.time.{Instant, LocalDate}
 import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalDate}
 
 import scala.xml.Node
 

@@ -5,11 +5,13 @@ import scala.xml.Elem
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import fs2.Stream
-import org.http4s.Request
-import org.http4s.Uri
+
 import org.http4s.client.Client
 import org.http4s.scalaxml._
+import org.http4s.{Request, Uri}
+
+import fs2.Stream
+
 import org.typelevel.log4cats.Logger
 import repcheck.ingestion.common.errors.XmlParseFailed
 import repcheck.pipeline.models.errors.RetryConfig

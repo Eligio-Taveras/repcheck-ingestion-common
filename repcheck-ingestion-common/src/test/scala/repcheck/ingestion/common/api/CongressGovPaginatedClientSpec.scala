@@ -2,15 +2,18 @@ package repcheck.ingestion.common.api
 
 import scala.concurrent.duration._
 
-import cats.effect.{IO, Temporal}
 import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Temporal}
+
+import io.circe.{Decoder, Json}
+
+import org.http4s.circe._
+import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.{Request, Uri}
+
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
-import io.circe.{Decoder, Json}
-import org.http4s.{Request, Uri}
-import org.http4s.circe._
-import org.http4s.ember.client.EmberClientBuilder
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers

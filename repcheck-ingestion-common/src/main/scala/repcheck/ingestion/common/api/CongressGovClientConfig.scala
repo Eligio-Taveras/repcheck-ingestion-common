@@ -3,6 +3,7 @@ package repcheck.ingestion.common.api
 import scala.concurrent.duration._
 
 import pureconfig.ConfigReader
+
 import repcheck.pipeline.models.errors.RetryConfig
 
 final case class CongressGovClientConfig(

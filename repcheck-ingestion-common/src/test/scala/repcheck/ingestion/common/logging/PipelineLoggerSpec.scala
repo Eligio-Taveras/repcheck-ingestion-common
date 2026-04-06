@@ -1,13 +1,14 @@
 package repcheck.ingestion.common.logging
 
-import cats.effect.IO
-import cats.effect.Ref
+import java.util.UUID
+
 import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Ref}
+
 import io.circe.parser.parse
+
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import java.util.UUID
 
 class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
 

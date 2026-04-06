@@ -1,6 +1,7 @@
 package repcheck.ingestion.common.xml
 
 import pureconfig.ConfigReader
+
 import repcheck.pipeline.models.errors.RetryConfig
 
 final case class HttpClientConfig(
