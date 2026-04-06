@@ -78,6 +78,8 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
       ++ catsEffect ++ testDeps
       ++ doobie
       ++ pubSub
+      ++ xml
+      ++ logging
     ,
     libraryDependencies += "com.h2database" % "h2" % "2.2.224" % Test,
     libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.2",

@@ -42,10 +42,19 @@ object Dependencies {
   // Google Cloud Pub/Sub
   private val gcpPubSub = "com.google.cloud" % "google-cloud-pubsub" % gcpPubSubVersion
 
+  // XML parsing
+  private val scalaXml = "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion
+  private val http4sScalaXml = "org.http4s" %% "http4s-scala-xml" % "0.23.14"
+
+  // Logging
+  private val log4catsSlf4j = "org.typelevel" %% "log4cats-slf4j" % log4catsVersion
+  private val logbackClassic = "ch.qos.logback" % "logback-classic" % logbackVersion
+
   // Test dependencies
   private val scalatestPlusMockito = "org.scalatestplus" %% "mockito-5-12" % "3.2.19.0" % Test
   private val catsEffectTesting = "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % Test
   private val catsEffectTestkit = "org.typelevel" %% "cats-effect-testkit" % catsEffectVersion % Test
+  private val wiremock = "org.wiremock" % "wiremock-standalone" % wiremockVersion % Test
 
   val doobie: Seq[ModuleID]     = Seq(doobieCore, doobieHikari, doobiePostgres)
   val pureConfig: Seq[ModuleID] = Seq(pureConfigCore)
@@ -58,5 +67,9 @@ object Dependencies {
 
   val pubSub: Seq[ModuleID] = Seq(gcpPubSub)
 
-  val testDeps: Seq[ModuleID] = Seq(scalatestPlusMockito, catsEffectTesting, catsEffectTestkit)
+  val xml: Seq[ModuleID] = Seq(scalaXml, http4sScalaXml)
+
+  val logging: Seq[ModuleID] = Seq(log4catsSlf4j, logbackClassic)
+
+  val testDeps: Seq[ModuleID] = Seq(scalatestPlusMockito, catsEffectTesting, catsEffectTestkit, wiremock)
 }
