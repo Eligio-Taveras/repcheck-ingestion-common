@@ -1,6 +1,6 @@
 package repcheck.ingestion.common.xml
 
-import java.time.LocalDate
+import java.time.{Instant, LocalDate}
 import java.time.format.DateTimeFormatter
 
 import org.scalatest.flatspec.AnyFlatSpec
@@ -130,6 +130,116 @@ class XmlParsingHelpersSpec extends AnyFlatSpec with Matchers {
     val xml    = <root></root>
     val result = XmlParsingHelpers.children(xml, "member")
     result shouldBe empty
+  }
+
+  // --- Long helpers ---
+
+  "long" should "parse valid long values" in {
+    val xml = <root><identifier>1191202517</identifier></root>
+    XmlParsingHelpers.long(xml, "identifier") shouldBe Right(1191202517L)
+  }
+
+  it should "return Left for non-numeric text" in {
+    val xml = <root><identifier>abc</identifier></root>
+    XmlParsingHelpers.long(xml, "identifier").isLeft shouldBe true
+  }
+
+  it should "return Left for absent tag" in {
+    val xml = <root></root>
+    XmlParsingHelpers.long(xml, "identifier").isLeft shouldBe true
+  }
+
+  "longOpt" should "return Some for valid long" in {
+    val xml = <root><identifier>1191202517</identifier></root>
+    XmlParsingHelpers.longOpt(xml, "identifier") shouldBe Some(1191202517L)
+  }
+
+  it should "return None for absent tag" in {
+    val xml = <root></root>
+    XmlParsingHelpers.longOpt(xml, "identifier") shouldBe None
+  }
+
+  it should "return None for non-numeric text" in {
+    val xml = <root><identifier>abc</identifier></root>
+    XmlParsingHelpers.longOpt(xml, "identifier") shouldBe None
+  }
+
+  // --- Boolean helpers ---
+
+  "bool" should "parse true" in {
+    val xml = <root><isOriginalCosponsor>true</isOriginalCosponsor></root>
+    XmlParsingHelpers.bool(xml, "isOriginalCosponsor") shouldBe Right(true)
+  }
+
+  it should "parse false" in {
+    val xml = <root><isCivilian>false</isCivilian></root>
+    XmlParsingHelpers.bool(xml, "isCivilian") shouldBe Right(false)
+  }
+
+  it should "return Left for non-boolean text" in {
+    val xml = <root><isOriginalCosponsor>yes</isOriginalCosponsor></root>
+    XmlParsingHelpers.bool(xml, "isOriginalCosponsor").isLeft shouldBe true
+  }
+
+  it should "return Left for absent tag" in {
+    val xml = <root></root>
+    XmlParsingHelpers.bool(xml, "isOriginalCosponsor").isLeft shouldBe true
+  }
+
+  "boolOpt" should "return Some(true) for true" in {
+    val xml = <root><isCurrent>true</isCurrent></root>
+    XmlParsingHelpers.boolOpt(xml, "isCurrent") shouldBe Some(true)
+  }
+
+  it should "return Some(false) for false" in {
+    val xml = <root><isCurrent>false</isCurrent></root>
+    XmlParsingHelpers.boolOpt(xml, "isCurrent") shouldBe Some(false)
+  }
+
+  it should "return None for absent tag" in {
+    val xml = <root></root>
+    XmlParsingHelpers.boolOpt(xml, "isCurrent") shouldBe None
+  }
+
+  it should "return None for non-boolean text" in {
+    val xml = <root><isCurrent>maybe</isCurrent></root>
+    XmlParsingHelpers.boolOpt(xml, "isCurrent") shouldBe None
+  }
+
+  // --- Instant helpers ---
+
+  "instant" should "parse UTC instant" in {
+    val xml = <root><updateDate>2025-05-27T14:16:54Z</updateDate></root>
+    XmlParsingHelpers.instant(xml, "updateDate") shouldBe Right(
+      Instant.parse("2025-05-27T14:16:54Z")
+    )
+  }
+
+  it should "return Left for invalid instant" in {
+    val xml = <root><updateDate>not-a-date</updateDate></root>
+    XmlParsingHelpers.instant(xml, "updateDate").isLeft shouldBe true
+  }
+
+  it should "return Left for absent tag" in {
+    val xml = <root></root>
+    XmlParsingHelpers.instant(xml, "updateDate").isLeft shouldBe true
+  }
+
+  "instantOpt" should "return Some for valid UTC instant" in {
+    val xml = <root><updateDate>2025-05-27T14:16:54Z</updateDate></root>
+    XmlParsingHelpers.instantOpt(xml, "updateDate") shouldBe Some(
+      Instant.parse("2025-05-27T14:16:54Z")
+    )
+  }
+
+  it should "return None for absent tag" in {
+    val xml = <root></root>
+    XmlParsingHelpers.instantOpt(xml, "updateDate") shouldBe None
+  }
+
+  it should "return None for invalid instant" in {
+    val xml = <root><updateDate>2024-01-15</updateDate></root>
+    XmlParsingHelpers.instantOpt(xml, "updateDate") shouldBe None
   }
 
 }
