@@ -30,6 +30,16 @@ jobs:
       - name: Install sbt
         uses: sbt/setup-sbt@v1
 
+      - name: Configure GitHub Packages credentials
+        run: |
+          mkdir -p ~/.sbt
+          cat > ~/.sbt/.github-packages-credentials << CREDS
+          realm=GitHub Package Registry
+          host=maven.pkg.github.com
+          user=\${{ github.actor }}
+          password=\${{ secrets.GH_PACKAGES_TOKEN }}
+          CREDS
+
       - name: Check formatting (Scalafmt)
         run: sbt scalafmtCheckAll
 
