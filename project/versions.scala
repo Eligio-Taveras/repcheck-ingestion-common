@@ -6,4 +6,8 @@ object Versions {
   val catsEffectVersion = "3.5.4"
   val fs2Version        = "3.10.2"
   val gcpPubSubVersion  = "1.133.1"
+  val log4catsVersion   = "2.6.0"
+  val logbackVersion    = "1.5.6"
+  val wiremockVersion   = "3.5.4"
+  val scalaXmlVersion   = "2.2.0"
 }
