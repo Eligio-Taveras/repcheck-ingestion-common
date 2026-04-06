@@ -85,11 +85,11 @@ jobs:
           echo "Tagged \${{ github.sha }} as \$TAG"
 
       # ── Publish with the new tag (dynver resolves a clean version) ──
-      - name: Set up JDK $java_version$
+      - name: Set up JDK 21
         if: steps.labels.outputs.bump != 'skip'
         uses: actions/setup-java@v4.7.0
         with:
-          java-version: '$java_version$'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Install sbt
@@ -98,7 +98,7 @@ jobs:
 
       - name: Publish to GitHub Packages
         if: steps.labels.outputs.bump != 'skip'
-        run: sbt $name;format="camel"$/publish
+        run: sbt repcheckingestioncommon/publish
 
       # ── Create a GitHub Release for visibility ──
       - name: Create GitHub Release
@@ -106,7 +106,7 @@ jobs:
         run: |
           TAG="\${{ steps.version.outputs.tag }}"
           PR="\${{ steps.pr.outputs.number }}"
-          BODY="Published \`$organization$:$name$_3:\${TAG#v}\` to GitHub Packages."
+          BODY="Published \`com.repcheck:repcheck-ingestion-common_3:\${TAG#v}\` to GitHub Packages."
           if [ -n "\$PR" ]; then
             BODY="\$BODY\n\nSource: #\$PR"
           fi

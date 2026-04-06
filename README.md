@@ -1,12 +1,12 @@
-# $name$
+# repcheck-ingestion-common
 
-$description$
+Shared library for RepCheck data ingestion pipelines — API clients, XML parsing, structured logging, and pipeline execution helpers.
 
 ## Getting Started
 
 ### Prerequisites
-- JDK $java_version$ (Temurin recommended)
-- SBT $sbt_version$
+- JDK 21 (Temurin recommended)
+- SBT 1.9.9
 
 ### Build
 ```bash
@@ -27,7 +27,7 @@ sbt docGenerator/run
 
 ## Project Structure
 ```
-$name$/
+repcheck-ingestion-common/
   src/main/scala/       # Application code
   src/test/scala/       # Tests
 doc-generator/          # Doc compression utility

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "feature/**", "claude/**", "dev/**"]
+    branches: [main, "feature/**", "feat/**", "fix/**", "chore/**", "claude/**", "dev/**"]
   pull_request:
-    branches: [main, "feature/**", "claude/**", "dev/**"]
+    branches: [main]
 
 jobs:
   build:
@@ -21,10 +21,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
-      - name: Set up JDK $java_version$
+      - name: Set up JDK 21
         uses: actions/setup-java@v4.7.0
         with:
-          java-version: '$java_version$'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Install sbt
@@ -55,10 +55,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
-      - name: Set up JDK $java_version$
+      - name: Set up JDK 21
         uses: actions/setup-java@v4.7.0
         with:
-          java-version: '$java_version$'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Install sbt
