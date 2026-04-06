@@ -14,8 +14,8 @@ jobs:
       contents: read
 
     env:
-      GITHUB_TOKEN: \${{ secrets.GH_PACKAGES_TOKEN }}
-      GITHUB_ACTOR: \${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_ACTOR: ${{ github.actor }}
 
     steps:
       - name: Checkout code
@@ -29,11 +29,6 @@ jobs:
 
       - name: Install sbt
         uses: sbt/setup-sbt@v1
-
-      - name: Configure GitHub Packages credentials
-        run: |
-          mkdir -p ~/.sbt
-          printf 'realm=GitHub Package Registry\nhost=maven.pkg.github.com\nuser=%s\npassword=%s\n' "\${{ github.actor }}" "\${{ secrets.GH_PACKAGES_TOKEN }}" > ~/.sbt/.github-packages-credentials
 
       - name: Check formatting (Scalafmt)
         run: sbt scalafmtCheckAll
@@ -50,15 +45,15 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: \${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
   doc-generator:
     runs-on: ubuntu-latest
 
     env:
-      GITHUB_TOKEN: \${{ secrets.GH_PACKAGES_TOKEN }}
-      GITHUB_ACTOR: \${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_ACTOR: ${{ github.actor }}
 
     steps:
       - name: Checkout code
