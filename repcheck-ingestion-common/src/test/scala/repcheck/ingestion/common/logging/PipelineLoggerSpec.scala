@@ -179,7 +179,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.debug(baseContext, "should not appear")
       _             <- logger.info(baseContext, "should not appear either")
       _             <- logger.warn(baseContext, "should appear")
-      _             <- logger.error(baseContext, "should also appear")
+      _             <- logger.error(baseContext, "should also appear", None)
       lines         <- ref.get
     } yield {
       lines should have size 2
@@ -203,7 +203,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.debug(baseContext, "d")
       _             <- logger.info(baseContext, "i")
       _             <- logger.warn(baseContext, "w")
-      _             <- logger.error(baseContext, "e")
+      _             <- logger.error(baseContext, "e", None)
       lines         <- ref.get
     } yield lines should have size 4
   }
@@ -215,7 +215,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       (logger, ref) <- makeTestLogger(LoggingConfig(level = "DEBUG"))
       _             <- logger.info(baseContext, "pipeline check")
       _             <- logger.warn(baseContext, "pipeline check")
-      _             <- logger.error(baseContext, "pipeline check")
+      _             <- logger.error(baseContext, "pipeline check", None)
       _             <- logger.debug(baseContext, "pipeline check")
       lines         <- ref.get
     } yield {
@@ -282,7 +282,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
   it should "omit error field when no cause provided" in {
     for {
       (logger, ref) <- makeTestLogger()
-      _             <- logger.error(baseContext, "error without cause")
+      _             <- logger.error(baseContext, "error without cause", None)
       lines         <- ref.get
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
@@ -298,7 +298,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.debug(baseContext, "d")
       _             <- logger.info(baseContext, "i")
       _             <- logger.warn(baseContext, "w")
-      _             <- logger.error(baseContext, "e")
+      _             <- logger.error(baseContext, "e", None)
       lines         <- ref.get
     } yield {
       val levels = lines.flatMap(line => parse(line).toOption.flatMap(_.hcursor.get[String]("level").toOption))
@@ -333,6 +333,33 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       c.get[String]("entityId").toOption shouldBe Some("118-hr-1234")
       c.get[String]("pipeline").toOption shouldBe Some(testPipeline)
       c.get[String]("congress").toOption shouldBe Some("118")
+    }
+  }
+
+  // --- Factory method coverage ---
+
+  it should "create a logger via single-arg make and log to stdout" in {
+    for {
+      logger <- PipelineLoggerFactory.make[IO]("single-arg-pipeline")
+      _      <- logger.info(baseContext, "stdout test")
+    } yield logger shouldBe a[PipelineLogger[?]]
+  }
+
+  it should "create a logger via two-arg make with custom config" in {
+    for {
+      logger <- PipelineLoggerFactory.make[IO]("two-arg-pipeline", LoggingConfig(level = "WARN", jsonOutput = false))
+    } yield logger shouldBe a[PipelineLogger[?]]
+  }
+
+  it should "support error without explicit cause parameter" in {
+    for {
+      (logger, ref) <- makeTestLogger()
+      _             <- logger.error(baseContext, "error without cause", None)
+      lines         <- ref.get
+    } yield {
+      val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
+      json.hcursor.get[String]("level").toOption shouldBe Some("ERROR")
+      json.hcursor.get[String]("error").toOption shouldBe None
     }
   }
 

@@ -3,7 +3,6 @@ package repcheck.ingestion.common.api
 import scala.concurrent.duration._
 
 import pureconfig.ConfigReader
-import pureconfig.generic.derivation.default._
 
 final case class HttpClientConfig(
   connectTimeout: FiniteDuration = 10.seconds,

@@ -11,8 +11,7 @@ trait CongressGovPaginatedClient[F[_], T] {
 
   implicit protected def temporal: Temporal[F]
 
-  def fetchPage(params: FetchParams): F[PagedResponse[T]] =
-    temporal.raiseError(new UnsupportedOperationException("fetchPage not implemented"))
+  def fetchPage(params: FetchParams): F[PagedResponse[T]]
 
   def fetchAll(params: FetchParams): Stream[F, T] = {
     val F = temporal

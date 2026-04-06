@@ -8,7 +8,17 @@ import pureconfig.ConfigSource
 
 class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
 
-  "CongressGovClientConfig" should "load from HOCON with all fields" in {
+  "CongressGovClientConfig" should "have sensible Scala defaults" in {
+    val config = CongressGovClientConfig(apiKey = "test-key", baseUrl = "https://api.congress.gov/v3")
+    config.apiKey shouldBe "test-key"
+    config.baseUrl shouldBe "https://api.congress.gov/v3"
+    config.pageSize shouldBe 250
+    config.pageDelay shouldBe Duration.Zero
+    config.retry.maxRetries shouldBe 3
+    config.http.connectTimeout shouldBe 10.seconds
+  }
+
+  it should "load from HOCON with all fields" in {
     val hocon =
       """
         |api-key = "test-api-key-123"

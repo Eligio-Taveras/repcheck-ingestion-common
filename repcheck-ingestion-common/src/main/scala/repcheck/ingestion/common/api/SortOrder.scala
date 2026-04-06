@@ -10,10 +10,10 @@ enum SortOrder(val queryValue: String) {
 object SortOrder {
 
   given ConfigReader[SortOrder] = ConfigReader[String].map { value =>
-    value.toLowerCase match {
-      case "updatedateasc" | "update-date-asc"   => SortOrder.UpdateDateAsc
-      case "updatedatedesc" | "update-date-desc" => SortOrder.UpdateDateDesc
-      case _                                     => SortOrder.UpdateDateDesc
+    value match {
+      case "updateDate+asc"  => SortOrder.UpdateDateAsc
+      case "updateDate+desc" => SortOrder.UpdateDateDesc
+      case _                 => SortOrder.UpdateDateDesc
     }
   }
 
