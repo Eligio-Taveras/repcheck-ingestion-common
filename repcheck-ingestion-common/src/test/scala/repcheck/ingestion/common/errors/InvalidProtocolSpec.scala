@@ -7,7 +7,7 @@ class InvalidProtocolSpec extends AnyFlatSpec with Matchers {
 
   "InvalidProtocol" should "be an Exception with the provided message" in {
     val error = InvalidProtocol("Expected HTTPS but got HTTP")
-    error.getMessage shouldBe "Expected HTTPS but got HTTP"
+    val _     = error.getMessage shouldBe "Expected HTTPS but got HTTP"
     error shouldBe a[Exception]
   }
 

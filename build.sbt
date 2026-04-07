@@ -42,11 +42,6 @@ lazy val commonSettings = Seq(
     if (isScala212.value) ScalaCConfig.scalaCOption2_12
     else Set.empty[ScalacOption]
   },
-  // ScalaTest assertions return `Assertion`, which trips Scala 3.7's
-  // non-unit-statement warning when multiple `shouldBe` calls appear in a
-  // single test body. Disable that one warning under Test only — production
-  // code still gets the full check.
-  Test / tpolecatExcludeOptions += org.typelevel.scalacoptions.ScalacOptions.warnNonUnitStatement,
 
   // WartRemover — enforces FP discipline at compile time
   wartremoverErrors ++= Seq(

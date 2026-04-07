@@ -20,11 +20,11 @@ class DatabaseConfigSpec extends AnyFlatSpec with Matchers {
         |""".stripMargin
 
     val config = ConfigSource.string(hocon).loadOrThrow[DatabaseConfig]
-    config.host shouldBe "db.example.com"
-    config.port shouldBe 5433
-    config.database shouldBe "repcheck"
-    config.username shouldBe "admin"
-    config.password shouldBe "secret"
+    val _      = config.host shouldBe "db.example.com"
+    val _      = config.port shouldBe 5433
+    val _      = config.database shouldBe "repcheck"
+    val _      = config.username shouldBe "admin"
+    val _      = config.password shouldBe "secret"
     config.maxConnections shouldBe 20
   }
 

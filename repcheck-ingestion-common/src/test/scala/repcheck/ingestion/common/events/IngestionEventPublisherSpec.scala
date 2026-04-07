@@ -45,12 +45,12 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       msgId    <- eventPub.billTextAvailable(event, correlationId)
       captured <- capturingPub.captured
     } yield {
-      msgId shouldBe "msg-1"
-      captured should have length 1
+      val _                       = msgId shouldBe "msg-1"
+      val _                       = captured should have length 1
       val (pubTopic, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
-      pubTopic shouldBe topicName
-      json should include("\"eventType\":\"bill.text.available\"")
-      json should include("\"billId\":\"hr1-118\"")
+      val _                       = pubTopic shouldBe topicName
+      val _                       = json should include("\"eventType\":\"bill.text.available\"")
+      val _                       = json should include("\"billId\":\"hr1-118\"")
       attrs shouldBe Map("eventType" -> "bill.text.available")
     }
     test.unsafeRunSync()
@@ -72,10 +72,10 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       msgId    <- eventPub.billTextIngested(event, correlationId)
       captured <- capturingPub.captured
     } yield {
-      msgId shouldBe "msg-1"
+      val _                = msgId shouldBe "msg-1"
       val (_, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
-      json should include("\"eventType\":\"bill.text.ingested\"")
-      json should include("\"billId\":\"s200-118\"")
+      val _                = json should include("\"eventType\":\"bill.text.ingested\"")
+      val _                = json should include("\"billId\":\"s200-118\"")
       attrs shouldBe Map("eventType" -> "bill.text.ingested")
     }
     test.unsafeRunSync()
@@ -96,10 +96,10 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       msgId    <- eventPub.voteRecorded(event, correlationId)
       captured <- capturingPub.captured
     } yield {
-      msgId shouldBe "msg-1"
+      val _                = msgId shouldBe "msg-1"
       val (_, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
-      json should include("\"eventType\":\"vote.recorded\"")
-      json should include("\"voteId\":\"h123-118.2024\"")
+      val _                = json should include("\"eventType\":\"vote.recorded\"")
+      val _                = json should include("\"voteId\":\"h123-118.2024\"")
       attrs shouldBe Map("eventType" -> "vote.recorded")
     }
     test.unsafeRunSync()
@@ -113,10 +113,10 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       msgId    <- eventPub.memberUpdated(event, correlationId)
       captured <- capturingPub.captured
     } yield {
-      msgId shouldBe "msg-1"
+      val _                = msgId shouldBe "msg-1"
       val (_, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
-      json should include("\"eventType\":\"member.updated\"")
-      json should include("\"memberId\":\"A000001\"")
+      val _                = json should include("\"eventType\":\"member.updated\"")
+      val _                = json should include("\"memberId\":\"A000001\"")
       attrs shouldBe Map("eventType" -> "member.updated")
     }
     test.unsafeRunSync()
@@ -139,7 +139,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
     } yield {
       val (_, json1, _) = captured1.headOption.getOrElse(fail("No captured messages from pub1"))
       val (_, json2, _) = captured2.headOption.getOrElse(fail("No captured messages from pub2"))
-      json1 should include("\"source\":\"bills-pipeline\"")
+      val _             = json1 should include("\"source\":\"bills-pipeline\"")
       json2 should include("\"source\":\"votes-pipeline\"")
     }
     test.unsafeRunSync()
@@ -156,13 +156,13 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
     } yield {
       val (_, json, _) = captured.headOption.getOrElse(fail("No captured messages"))
       val parsed       = decode[PipelineEvent[MemberUpdatedEvent]](json)
-      parsed.isRight shouldBe true
-      val envelope = parsed.getOrElse(fail("Failed to decode PipelineEvent"))
-      envelope.eventId.toString should not be empty
-      envelope.correlationId shouldBe correlationId
-      envelope.timestamp.toString should not be empty
-      val afterTest = Instant.now()
-      envelope.timestamp.isAfter(beforeTest.minusSeconds(1)) shouldBe true
+      val _            = parsed.isRight shouldBe true
+      val envelope     = parsed.getOrElse(fail("Failed to decode PipelineEvent"))
+      val _            = envelope.eventId.toString should not be empty
+      val _            = envelope.correlationId shouldBe correlationId
+      val _            = envelope.timestamp.toString should not be empty
+      val afterTest    = Instant.now()
+      val _            = envelope.timestamp.isAfter(beforeTest.minusSeconds(1)) shouldBe true
       envelope.timestamp.isBefore(afterTest.plusSeconds(1)) shouldBe true
     }
     test.unsafeRunSync()
@@ -177,7 +177,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
     val event    = MemberUpdatedEvent(memberId = "D000001")
 
     val result = eventPub.memberUpdated(event, UUID.randomUUID()).attempt.unsafeRunSync()
-    result.isLeft shouldBe true
+    val _      = result.isLeft shouldBe true
     result.swap.getOrElse(fail("Expected error")).getMessage shouldBe "Pub/Sub unavailable"
   }
 
@@ -204,10 +204,10 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
 
       captured <- capturingPub.captured
     } yield {
-      captured should have length 4
-      captured(0)._3 shouldBe Map("eventType" -> "bill.text.available")
-      captured(1)._3 shouldBe Map("eventType" -> "bill.text.ingested")
-      captured(2)._3 shouldBe Map("eventType" -> "vote.recorded")
+      val _ = captured should have length 4
+      val _ = captured(0)._3 shouldBe Map("eventType" -> "bill.text.available")
+      val _ = captured(1)._3 shouldBe Map("eventType" -> "bill.text.ingested")
+      val _ = captured(2)._3 shouldBe Map("eventType" -> "vote.recorded")
       captured(3)._3 shouldBe Map("eventType" -> "member.updated")
     }
     test.unsafeRunSync()

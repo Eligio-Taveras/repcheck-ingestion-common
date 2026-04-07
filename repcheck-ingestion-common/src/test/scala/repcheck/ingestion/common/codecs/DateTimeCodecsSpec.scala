@@ -20,10 +20,10 @@ class DateTimeCodecsSpec extends AnyFlatSpec with Matchers {
   it should "decode a valid ISO ZonedDateTime string" in {
     val jsonStr = "\"2024-03-15T10:30:00Z\""
     val result  = io.circe.parser.decode[ZonedDateTime](jsonStr)
-    result.isRight shouldBe true
+    val _       = result.isRight shouldBe true
     result.foreach { zdt =>
-      zdt.getYear shouldBe 2024
-      zdt.getMonthValue shouldBe 3
+      val _ = zdt.getYear shouldBe 2024
+      val _ = zdt.getMonthValue shouldBe 3
       zdt.getDayOfMonth shouldBe 15
     }
   }
@@ -38,7 +38,7 @@ class DateTimeCodecsSpec extends AnyFlatSpec with Matchers {
     val original = ZonedDateTime.parse("2024-06-15T14:30:00+02:00")
     val json     = original.asJson
     val decoded  = json.as[ZonedDateTime]
-    decoded.isRight shouldBe true
+    val _        = decoded.isRight shouldBe true
     decoded.foreach(zdt => zdt.toInstant shouldBe original.toInstant)
   }
 

@@ -14,7 +14,7 @@ class UpsertHelperSpec extends AnyFlatSpec with Matchers {
     )
 
     val sql = fragment.internals.sql
-    sql should include("""INSERT INTO "members" ("id", "name", "email")""")
+    val _   = sql should include("""INSERT INTO "members" ("id", "name", "email")""")
     sql should include("VALUES (?, ?, ?)")
   }
 
@@ -39,7 +39,7 @@ class UpsertHelperSpec extends AnyFlatSpec with Matchers {
     )
 
     val sql = fragment.internals.sql
-    sql should include("""DO UPDATE SET "position" = EXCLUDED."position"""")
+    val _   = sql should include("""DO UPDATE SET "position" = EXCLUDED."position"""")
     sql should not include """"date" = EXCLUDED."date""""
   }
 
@@ -64,8 +64,8 @@ class UpsertHelperSpec extends AnyFlatSpec with Matchers {
     )
 
     val sql = fragment.internals.sql
-    sql should include(""""my_table"""")
-    sql should include(""""col_a"""")
+    val _   = sql should include(""""my_table"""")
+    val _   = sql should include(""""col_a"""")
     sql should include(""""col_b"""")
   }
 
@@ -79,7 +79,7 @@ class UpsertHelperSpec extends AnyFlatSpec with Matchers {
 
     val sql = fragment.internals.sql
     // Double quotes inside identifiers should be escaped by doubling them
-    sql should include(""""my""table"""")
+    val _ = sql should include(""""my""table"""")
     sql should include(""""col""a"""")
   }
 
@@ -92,8 +92,8 @@ class UpsertHelperSpec extends AnyFlatSpec with Matchers {
     )
 
     val sql = fragment.internals.sql
-    sql should include(""""first_name" = EXCLUDED."first_name"""")
-    sql should include(""""last_name" = EXCLUDED."last_name"""")
+    val _   = sql should include(""""first_name" = EXCLUDED."first_name"""")
+    val _   = sql should include(""""last_name" = EXCLUDED."last_name"""")
     sql should include(""""party" = EXCLUDED."party"""")
   }
 

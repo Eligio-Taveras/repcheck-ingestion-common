@@ -39,7 +39,7 @@ class EntityRepositorySpec extends AnyFlatSpec with Matchers {
     } yield store
 
     val store = program.unsafeRunSync()
-    store should contain key "B000444"
+    val _     = store should contain key "B000444"
     store("B000444").naturalKey shouldBe "B000444"
   }
 
@@ -56,8 +56,8 @@ class EntityRepositorySpec extends AnyFlatSpec with Matchers {
     } yield (store, callCount)
 
     val (store, callCount) = program.unsafeRunSync()
-    callCount shouldBe 2
-    store should have size 1
+    val _                  = callCount shouldBe 2
+    val _                  = store should have size 1
     store("B000444").naturalKey shouldBe "B000444"
   }
 

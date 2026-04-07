@@ -9,7 +9,7 @@ class LoggingConfigSpec extends AnyFlatSpec with Matchers {
 
   it should "have sensible defaults" in {
     val config = LoggingConfig()
-    config.level shouldBe "INFO"
+    val _      = config.level shouldBe "INFO"
     config.jsonOutput shouldBe true
   }
 
@@ -19,9 +19,9 @@ class LoggingConfigSpec extends AnyFlatSpec with Matchers {
       |json-output = false
       """.stripMargin)
     val result = source.load[LoggingConfig]
-    result.isRight shouldBe true
+    val _      = result.isRight shouldBe true
     val config = result.fold(e => fail(s"expected Right but got Left: $e"), identity)
-    config.level shouldBe "WARN"
+    val _      = config.level shouldBe "WARN"
     config.jsonOutput shouldBe false
   }
 
@@ -31,9 +31,9 @@ class LoggingConfigSpec extends AnyFlatSpec with Matchers {
       |json-output = true
       """.stripMargin)
     val result = source.load[LoggingConfig]
-    result.isRight shouldBe true
+    val _      = result.isRight shouldBe true
     val config = result.fold(e => fail(s"expected Right but got Left: $e"), identity)
-    config.level shouldBe "INFO"
+    val _      = config.level shouldBe "INFO"
     config.jsonOutput shouldBe true
   }
 

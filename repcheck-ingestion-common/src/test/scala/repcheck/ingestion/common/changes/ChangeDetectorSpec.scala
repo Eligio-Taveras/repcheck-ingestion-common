@@ -47,8 +47,8 @@ class ChangeDetectorSpec extends AnyFlatSpec with Matchers {
     )
     result match {
       case ChangeReport.Updated(i, s, diff) =>
-        i shouldBe incoming
-        s shouldBe stored
+        val _ = i shouldBe incoming
+        val _ = s shouldBe stored
         diff.isOk shouldBe false
       case other => fail(s"expected Updated, got $other")
     }
@@ -111,8 +111,8 @@ class ChangeDetectorSpec extends AnyFlatSpec with Matchers {
     )
     result match {
       case ChangeReport.Updated(i, s, diff) =>
-        i shouldBe incoming
-        s shouldBe stored
+        val _ = i shouldBe incoming
+        val _ = s shouldBe stored
         diff.isOk shouldBe false
       case other => fail(s"expected Updated, got $other")
     }
@@ -129,8 +129,8 @@ class ChangeDetectorSpec extends AnyFlatSpec with Matchers {
     )
     result match {
       case ChangeReport.Updated(i, s, diff) =>
-        i shouldBe incoming
-        s shouldBe stored
+        val _ = i shouldBe incoming
+        val _ = s shouldBe stored
         diff.isOk shouldBe false
       case other => fail(s"expected Updated, got $other")
     }

@@ -28,11 +28,11 @@ class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers {
     } yield entities
 
     val entities = program.unsafeRunSync()
-    entities should have size 1
-    val member = entities.headOption.getOrElse(fail("Entity should have been inserted"))
-    member.naturalKey shouldBe "B000444"
-    member.memberId shouldBe 0L
-    member.firstName shouldBe None
+    val _        = entities should have size 1
+    val member   = entities.headOption.getOrElse(fail("Entity should have been inserted"))
+    val _        = member.naturalKey shouldBe "B000444"
+    val _        = member.memberId shouldBe 0L
+    val _        = member.firstName shouldBe None
     member.lastName shouldBe None
   }
 
@@ -64,7 +64,7 @@ class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers {
 
     val entities = program.unsafeRunSync()
     // Both calls delegate to repository; the repository is responsible for idempotency
-    entities should have size 2
+    val _ = entities should have size 2
     all(entities.map(_.naturalKey)) shouldBe "B000444"
   }
 
@@ -78,22 +78,22 @@ class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers {
 
     val entities = program.unsafeRunSync()
     val member   = entities.headOption.getOrElse(fail("Entity should have been inserted"))
-    member.naturalKey shouldBe "S000148"
-    member.memberId shouldBe 0L
-    member.firstName shouldBe None
-    member.lastName shouldBe None
-    member.directOrderName shouldBe None
-    member.invertedOrderName shouldBe None
-    member.honorificName shouldBe None
-    member.birthYear shouldBe None
-    member.currentParty shouldBe None
-    member.state shouldBe None
-    member.district shouldBe None
-    member.imageUrl shouldBe None
-    member.imageAttribution shouldBe None
-    member.officialUrl shouldBe None
-    member.updateDate shouldBe None
-    member.createdAt shouldBe None
+    val _        = member.naturalKey shouldBe "S000148"
+    val _        = member.memberId shouldBe 0L
+    val _        = member.firstName shouldBe None
+    val _        = member.lastName shouldBe None
+    val _        = member.directOrderName shouldBe None
+    val _        = member.invertedOrderName shouldBe None
+    val _        = member.honorificName shouldBe None
+    val _        = member.birthYear shouldBe None
+    val _        = member.currentParty shouldBe None
+    val _        = member.state shouldBe None
+    val _        = member.district shouldBe None
+    val _        = member.imageUrl shouldBe None
+    val _        = member.imageAttribution shouldBe None
+    val _        = member.officialUrl shouldBe None
+    val _        = member.updateDate shouldBe None
+    val _        = member.createdAt shouldBe None
     member.updatedAt shouldBe None
   }
 
