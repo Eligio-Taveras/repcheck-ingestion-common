@@ -15,9 +15,11 @@ import repcheck.ingestion.common.db.TransactorResource
 import repcheck.ingestion.common.errors.RunIdMissing
 import repcheck.pipeline.models.constants.Tables
 
-class DoobieWorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers {
+class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers {
 
-  private def withFixture[A](block: (Transactor[IO], DoobieWorkflowStateUpdater[IO]) => IO[A]): A = {
+  private val testConfig = PipelineFailureHandlerConfig(maxRetries = 3)
+
+  private def withFixture[A](block: (Transactor[IO], WorkflowStateUpdater[IO]) => IO[A]): A = {
     val dbName = s"wfu_${UUID.randomUUID().toString.replace("-", "")}"
     val resource = TransactorResource.makeTransactor[IO](
       driverClassName = "org.h2.Driver",
@@ -46,7 +48,7 @@ class DoobieWorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers {
               PRIMARY KEY (workflow_run_id, step_name)
             )""".update.run.transact(xa)
       val _ = table // referenced for readability — proves the constant is used elsewhere in prod
-      create >> block(xa, new DoobieWorkflowStateUpdater[IO](xa))
+      create >> block(xa, new WorkflowStateUpdater[IO](xa, testConfig))
     }
     program.unsafeRunSync()
   }
@@ -181,7 +183,7 @@ class DoobieWorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  "DoobieWorkflowStateUpdater" should "raise RunIdMissing when the run ID is not a valid UUID" in {
+  "WorkflowStateUpdater" should "raise RunIdMissing when the run ID is not a valid UUID" in {
     withFixture { (_, updater) =>
       updater
         .recordStepStarted("not-a-uuid", "step")

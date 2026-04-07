@@ -9,7 +9,7 @@ import repcheck.ingestion.common.events.PubSubEventPublisher
  * Default [[PipelineFailureHandler]] implementation.
  *
  *   1. Increment the step's retry count via the [[WorkflowStateUpdater]].
- *   1. If the new count is `<= maxRetries`, republish `originalMessage` to the same Pub/Sub topic and return
+ *   1. If the new count is `<= config.maxRetries`, republish `originalMessage` to the same Pub/Sub topic and return
  *      [[FailureAction.Requeued]].
  *   1. Otherwise, record the step as failed with the error's message and return [[FailureAction.PermanentlyFailed]].
  *
@@ -21,7 +21,7 @@ class DefaultPipelineFailureHandler[F[_]: Monad](
   stateUpdater: WorkflowStateUpdater[F],
   publisher: PubSubEventPublisher[F],
   topic: String,
-  maxRetries: Int = DefaultPipelineFailureHandler.DefaultMaxRetries,
+  config: PipelineFailureHandlerConfig,
 ) extends PipelineFailureHandler[F] {
 
   override def handleFailure(
@@ -31,7 +31,7 @@ class DefaultPipelineFailureHandler[F[_]: Monad](
     error: Throwable,
   ): F[FailureAction] =
     stateUpdater.incrementRetryCount(runId, stepName).flatMap { newCount =>
-      if (newCount <= maxRetries) {
+      if (newCount <= config.maxRetries) {
         val attrs = Map("retryCount" -> newCount.toString)
         publisher.publish(topic, originalMessage, attrs).as(FailureAction.Requeued(newCount))
       } else {
@@ -42,8 +42,4 @@ class DefaultPipelineFailureHandler[F[_]: Monad](
       }
     }
 
-}
-
-object DefaultPipelineFailureHandler {
-  val DefaultMaxRetries: Int = 3
 }

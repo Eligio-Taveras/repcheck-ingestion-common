@@ -3,6 +3,8 @@ package repcheck.ingestion.common.execution
 import cats.effect.unsafe.implicits.global
 import cats.effect.{IO, Ref}
 
+import doobie.util.transactor.Transactor
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.events.PubSubEventPublisher
@@ -14,6 +16,21 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
   private val step    = "bills-pipeline"
   private val origMsg = """{"billId":"hr1-118"}"""
 
+  private val defaultConfig = PipelineFailureHandlerConfig(maxRetries = 3)
+
+  /**
+   * A never-connected Transactor used purely as a constructor argument for the test subclass below. All methods that
+   * would touch the database are overridden in the subclass, so this Transactor is never invoked.
+   */
+  private val stubXa: Transactor[IO] =
+    Transactor.fromDriverManager[IO](
+      driver = "org.h2.Driver",
+      url = "jdbc:h2:mem:stub;DB_CLOSE_DELAY=-1",
+      user = "sa",
+      password = "",
+      logHandler = None,
+    )
+
   /** Mutable in-memory state updater backed by a cats-effect Ref. */
   private def makeStateUpdater(
     initialRetryCount: Int
@@ -22,7 +39,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       counter <- Ref.of[IO, Int](initialRetryCount)
       failure <- Ref.of[IO, Option[String]](None)
     } yield {
-      val updater = new WorkflowStateUpdater[IO] {
+      val updater = new WorkflowStateUpdater[IO](stubXa, defaultConfig) {
         override def recordStepStarted(runId: String, stepName: String): IO[Unit]   = IO.unit
         override def recordStepCompleted(runId: String, stepName: String): IO[Unit] = IO.unit
         override def recordStepFailed(runId: String, stepName: String, error: String): IO[Unit] =
@@ -53,7 +70,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, _, upd) = state
       pubState <- makeCapturingPublisher
       (_, pub) = pubState
-      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic)
+      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, defaultConfig)
       action <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
     } yield action shouldBe FailureAction.Requeued(1)
     test.unsafeRunSync()
@@ -65,7 +82,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, _, upd) = state
       pubState <- makeCapturingPublisher
       (_, pub) = pubState
-      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic)
+      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, defaultConfig)
       action <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
     } yield action shouldBe FailureAction.Requeued(2)
     test.unsafeRunSync()
@@ -77,7 +94,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, _, upd) = state
       pubState <- makeCapturingPublisher
       (_, pub) = pubState
-      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic)
+      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, defaultConfig)
       action <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
     } yield action shouldBe FailureAction.Requeued(3)
     test.unsafeRunSync()
@@ -89,7 +106,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, failRef, upd) = state
       pubState <- makeCapturingPublisher
       (pubRef, pub) = pubState
-      handler       = new DefaultPipelineFailureHandler[IO](upd, pub, topic)
+      handler       = new DefaultPipelineFailureHandler[IO](upd, pub, topic, defaultConfig)
       action   <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
       captured <- pubRef.get
       recorded <- failRef.get
@@ -107,7 +124,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, _, upd) = state
       pubState <- makeCapturingPublisher
       (pubRef, pub) = pubState
-      handler       = new DefaultPipelineFailureHandler[IO](upd, pub, topic)
+      handler       = new DefaultPipelineFailureHandler[IO](upd, pub, topic, defaultConfig)
       _        <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
       captured <- pubRef.get
     } yield {
@@ -126,7 +143,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, _, upd) = state
       pubState <- makeCapturingPublisher
       (_, pub) = pubState
-      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, maxRetries = 5)
+      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, PipelineFailureHandlerConfig(maxRetries = 5))
       // 6th failure pushes the count to 6, which exceeds maxRetries=5.
       action <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
     } yield action shouldBe FailureAction.PermanentlyFailed(6)
@@ -139,7 +156,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, _, upd) = state
       pubState <- makeCapturingPublisher
       (_, pub) = pubState
-      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, maxRetries = 5)
+      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, PipelineFailureHandlerConfig(maxRetries = 5))
       action <- handler.handleFailure(runId, step, origMsg, new RuntimeException("boom"))
     } yield action shouldBe FailureAction.Requeued(5)
     test.unsafeRunSync()
@@ -151,7 +168,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       (_, failRef, upd) = state
       pubState <- makeCapturingPublisher
       (_, pub) = pubState
-      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic)
+      handler  = new DefaultPipelineFailureHandler[IO](upd, pub, topic, defaultConfig)
       // A no-arg RuntimeException has a null message — handler should fall back to class name.
       action   <- handler.handleFailure(runId, step, origMsg, new RuntimeException())
       recorded <- failRef.get
@@ -160,10 +177,6 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       recorded shouldBe Some("RuntimeException")
     }
     test.unsafeRunSync()
-  }
-
-  "DefaultMaxRetries" should "be 3" in {
-    DefaultPipelineFailureHandler.DefaultMaxRetries shouldBe 3
   }
 
 }
