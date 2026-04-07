@@ -42,7 +42,7 @@ class DefaultIngestionEventPublisher[F[_]: Sync](
   ): F[String] =
     for {
       envelope <- PipelineEvent.create[F, T](eventType, payload, correlationId, source)
-      json = envelope.asJson(PipelineEvent.encoder[T]).noSpaces
+      json = envelope.asJson(using PipelineEvent.encoder[T]).noSpaces
       messageId <- publisher.publish(topicName, json, Map("eventType" -> eventType))
     } yield messageId
 

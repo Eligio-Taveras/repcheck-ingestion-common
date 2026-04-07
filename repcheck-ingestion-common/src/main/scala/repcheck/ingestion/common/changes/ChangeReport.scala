@@ -1,7 +1,9 @@
 package repcheck.ingestion.common.changes
 
-enum ChangeReport[T] {
-  case New(entity: T)
-  case Updated(diffs: List[FieldDiff])
-  case Unchanged()
+import difflicious.DiffResult
+
+enum ChangeReport[+T] {
+  case New[T](entity: T)                                    extends ChangeReport[T]
+  case Updated[T](incoming: T, stored: T, diff: DiffResult) extends ChangeReport[T]
+  case Unchanged()                                          extends ChangeReport[Nothing]
 }

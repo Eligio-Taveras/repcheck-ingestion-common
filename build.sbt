@@ -11,7 +11,7 @@ ThisBuild / dynverSonatypeSnapshots := true
 
 lazy val commonSettings = Seq(
   organization := "com.repcheck",
-  scalaVersion := "3.4.1",
+  scalaVersion := "3.7.3",
   publishTo := Some(
     "GitHub Packages" at s"https://maven.pkg.github.com/Eligio-Taveras/repcheck-ingestion-common"
   ),
@@ -42,6 +42,11 @@ lazy val commonSettings = Seq(
     if (isScala212.value) ScalaCConfig.scalaCOption2_12
     else Set.empty[ScalacOption]
   },
+  // ScalaTest assertions return `Assertion`, which trips Scala 3.7's
+  // non-unit-statement warning when multiple `shouldBe` calls appear in a
+  // single test body. Disable that one warning under Test only — production
+  // code still gets the full check.
+  Test / tpolecatExcludeOptions += org.typelevel.scalacoptions.ScalacOptions.warnNonUnitStatement,
 
   // WartRemover — enforces FP discipline at compile time
   wartremoverErrors ++= Seq(
@@ -80,6 +85,7 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
       ++ pubSub
       ++ xml
       ++ logging
+      ++ diff
     ,
     libraryDependencies += "com.h2database" % "h2" % "2.2.224" % Test,
     libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.2",

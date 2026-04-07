@@ -1,10 +1,8 @@
 package repcheck.ingestion.common.placeholders
 
-import cats.Monad
-
 import repcheck.shared.models.placeholder.HasPlaceholder
 
-final class DefaultPlaceholderCreator[F[_]: Monad] extends PlaceholderCreator[F] {
+final class DefaultPlaceholderCreator[F[_]] extends PlaceholderCreator[F] {
 
   override def ensureExists[T <: Product](
     naturalKey: String,

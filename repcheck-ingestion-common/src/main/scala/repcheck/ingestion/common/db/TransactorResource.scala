@@ -9,11 +9,18 @@ import com.zaxxer.hikari.HikariConfig
 
 object TransactorResource {
 
-  private val PostgresDriver: String = "org.postgresql.Driver"
-
-  def make[F[_]: Async](config: DatabaseConfig): Resource[F, Transactor[F]] =
+  /**
+   * Build a HikariCP-backed `Transactor`.
+   *
+   * `driverClassName` defaults to PostgreSQL but is a parameter so callers can wire in a different JDBC driver (e.g.,
+   * H2 in tests, AlloyDB driver in production overrides) without having to bypass this entry point.
+   */
+  def make[F[_]: Async](
+    config: DatabaseConfig,
+    driverClassName: String = "org.postgresql.Driver",
+  ): Resource[F, Transactor[F]] =
     makeTransactor[F](
-      driverClassName = PostgresDriver,
+      driverClassName = driverClassName,
       url = config.jdbcUrl,
       user = config.username,
       pass = config.password,

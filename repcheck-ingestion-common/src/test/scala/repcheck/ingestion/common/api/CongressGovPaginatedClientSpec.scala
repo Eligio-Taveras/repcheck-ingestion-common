@@ -87,7 +87,7 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
             val cursor = json.hcursor
             val items = cursor
               .downField("items")
-              .as[List[TestItem]](Decoder.decodeList(TestItem.decoder))
+              .as[List[TestItem]](using Decoder.decodeList(using TestItem.decoder))
               .getOrElse(List.empty)
             val totalCount =
               cursor.downField("pagination").downField("count").as[Int].getOrElse(0)

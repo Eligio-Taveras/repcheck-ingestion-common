@@ -46,6 +46,9 @@ object Dependencies {
   private val scalaXml = "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion
   private val http4sScalaXml = "org.http4s" %% "http4s-scala-xml" % "0.23.14"
 
+  // Diffing
+  private val difflicious = "com.github.jatcwang" %% "difflicious-core" % Versions.difflicious
+
   // Logging
   private val log4catsSlf4j = "org.typelevel" %% "log4cats-slf4j" % log4catsVersion
   private val logbackClassic = "ch.qos.logback" % "logback-classic" % logbackVersion
@@ -70,6 +73,8 @@ object Dependencies {
   val xml: Seq[ModuleID] = Seq(scalaXml, http4sScalaXml)
 
   val logging: Seq[ModuleID] = Seq(log4catsSlf4j, logbackClassic)
+
+  val diff: Seq[ModuleID] = Seq(difflicious)
 
   val testDeps: Seq[ModuleID] = Seq(scalatestPlusMockito, catsEffectTesting, catsEffectTestkit, wiremock)
 }
