@@ -21,9 +21,10 @@ import repcheck.pipeline.models.workflow.state.WorkflowStepStatus
  * Updates a pipeline application's own execution state in the `workflow_run_steps` table defined in Component 2 §2.6.
  * Each pipeline owns its row(s) — the Launcher only reads this table to check dependencies.
  *
- * The row is keyed by `(workflow_run_id, step_name)`. `recordStepStarted` upserts — it either inserts a brand new row
- * (status `Running`) or updates the existing row in place, which matches the spec's requirement that each step has a
- * single row with status updated in place across retries.
+ * The row is keyed by `(workflow_run_id, step_name)`. `recordStepStarted` upserts via Postgres' `INSERT ... ON CONFLICT
+ * (workflow_run_id, step_name) DO UPDATE` — a single round trip that either inserts a brand-new row (status `Running`)
+ * or updates the existing row in place, which matches the spec's requirement that each step has a single row with
+ * status updated in place across retries.
  *
  * `workflow_run_id` is a `UUID` column in AlloyDB/Postgres. The trait signature uses `String` because pipeline
  * applications typically receive the run ID as a CLI argument; this implementation parses it once per call and raises
@@ -67,21 +68,13 @@ class WorkflowStateUpdater[F[_]: MonadCancelThrow](
       val now                         = Instant.now()
       val running: WorkflowStepStatus = WorkflowStepStatus.Running
       val maxRetries                  = config.maxRetries
-      val updateSql =
-        fr"""UPDATE """ ++ table ++
-          fr"""SET status = $running, started_at = $now, updated_at = $now
-              WHERE workflow_run_id = $uuid AND step_name = $stepName"""
-      val insertSql =
+      val sql =
         fr"""INSERT INTO """ ++ table ++
           fr"""(workflow_run_id, step_name, status, retry_count, max_retries, started_at, created_at, updated_at)
-              VALUES ($uuid, $stepName, $running, 0, $maxRetries, $now, $now, $now)"""
-      val program = for {
-        updated <- updateSql.update.run
-        _ <-
-          if (updated == 0) { insertSql.update.run }
-          else { 0.pure[doobie.ConnectionIO] }
-      } yield ()
-      program.transact(xa)
+              VALUES ($uuid, $stepName, $running, 0, $maxRetries, $now, $now, $now)
+              ON CONFLICT (workflow_run_id, step_name) DO UPDATE
+              SET status = EXCLUDED.status, started_at = EXCLUDED.started_at, updated_at = EXCLUDED.updated_at"""
+      sql.update.run.transact(xa).void
     }
 
   /** Mark a step as completed. Sets `status = Completed` and `completed_at = now`. */

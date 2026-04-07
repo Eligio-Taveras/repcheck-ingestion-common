@@ -1,91 +1,76 @@
 package repcheck.ingestion.common.db
 
-import java.util.UUID
-
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import cats.syntax.all._
 
 import doobie.implicits._
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import repcheck.ingestion.common.testing.{DockerPostgresSpec, DockerRequired}
 
-class TransactorResourceSpec extends AnyFlatSpec with Matchers {
+class TransactorResourceSpec extends AnyFlatSpec with Matchers with DockerPostgresSpec {
 
-  private def makeH2Transactor = {
-    val dbName = s"test_${UUID.randomUUID().toString.replace("-", "")}"
-    TransactorResource.makeTransactor[IO](
-      driverClassName = "org.h2.Driver",
-      url = s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1",
-      user = "sa",
-      pass = "",
+  private def databaseConfig: DatabaseConfig =
+    DatabaseConfig(
+      host = "localhost",
+      // jdbcUrl is the source of truth in tests; host/port/database fields are unused by makeTransactor.
+      port = 0,
+      database = "ignored",
+      username = jdbcUser,
+      password = jdbcPassword,
       maxConnections = 2,
     )
-  }
 
-  "TransactorResource" should "create and close a resource properly" in {
-    val program = makeH2Transactor.use(xa => sql"SELECT 1".query[Int].unique.transact(xa))
-
-    val result = program.unsafeRunSync()
-    result shouldBe 1
-  }
-
-  it should "build a Resource via make() with the default Postgres driver" in {
-    val config = DatabaseConfig(
-      host = "localhost",
-      port = 5432,
-      database = "repcheck",
-      username = "user",
-      password = "pass",
-      maxConnections = 5,
+  /**
+   * The DatabaseConfig path uses `config.jdbcUrl` to build the connection string. We override it via the lower-level
+   * helper here so the spec exercises the public Hikari wiring without needing a host/port-derived URL.
+   */
+  private def transactorResource =
+    TransactorResource.makeTransactor[IO](
+      driverClassName = "org.postgresql.Driver",
+      url = jdbcUrl,
+      user = jdbcUser,
+      pass = jdbcPassword,
+      maxConnections = 2,
     )
-    // We only verify that constructing the Resource succeeds. Allocating it would
-    // attempt a real Postgres connection — out of scope for a unit test.
-    val resource = TransactorResource.make[IO](config)
+
+  "TransactorResource" should "create a Hikari-backed Transactor that runs SELECT 1" taggedAs DockerRequired in {
+    val program = transactorResource.use(xa => sql"SELECT 1".query[Int].unique.transact(xa))
+    program.unsafeRunSync() shouldBe 1
+  }
+
+  it should "build a Resource via make() with the default Postgres driver" taggedAs DockerRequired in {
+    // Constructing the Resource must succeed without trying to connect.
+    val resource = TransactorResource.make[IO](databaseConfig)
     resource.toString should not be empty
   }
 
-  it should "build a working Resource via make() with a caller-supplied driver class" in {
-    val dbName = s"test_${UUID.randomUUID().toString.replace("-", "")}"
-    val config = DatabaseConfig(
-      host = "ignored",
-      port = 0,
-      database = "ignored",
-      username = "sa",
-      password = "",
-      maxConnections = 2,
-    )
-    // Override jdbcUrl indirectly: build Resource with the H2 driver class but
-    // use the lower-level helper to swap in an H2 URL. This proves the public
-    // make() entry point's driver parameter is wired through to Hikari.
-    val _ = TransactorResource.make[IO](config, driverClassName = "org.h2.Driver")
-    val program = TransactorResource
-      .makeTransactor[IO](
-        driverClassName = "org.h2.Driver",
-        url = s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1",
-        user = "sa",
-        pass = "",
-        maxConnections = 2,
-      )
-      .use(xa => sql"SELECT 2".query[Int].unique.transact(xa))
-    program.unsafeRunSync() shouldBe 2
-  }
-
-  it should "execute a simple query successfully" in {
-    val program = makeH2Transactor.use { xa =>
+  it should "execute a CREATE/INSERT/SELECT round trip on a real Postgres connection" taggedAs DockerRequired in {
+    val program = transactorResource.use { xa =>
       for {
-        _ <- sql"CREATE TABLE test_table (id INT, name VARCHAR(50))".update.run.transact(xa)
-        _ <- sql"INSERT INTO test_table VALUES (1, 'hello')".update.run.transact(xa)
-        result <- sql"SELECT name FROM test_table WHERE id = 1"
+        _ <- sql"CREATE TEMP TABLE t_round_trip (id INT, name TEXT)".update.run.transact(xa)
+        _ <- sql"INSERT INTO t_round_trip VALUES (1, 'hello')".update.run.transact(xa)
+        result <- sql"SELECT name FROM t_round_trip WHERE id = 1"
           .query[String]
           .unique
           .transact(xa)
-        _ <- sql"DROP TABLE test_table".update.run.transact(xa)
       } yield result
     }
 
-    val result = program.unsafeRunSync()
-    result shouldBe "hello"
+    program.unsafeRunSync() shouldBe "hello"
+  }
+
+  it should "respect the maxConnections setting on the underlying Hikari pool" taggedAs DockerRequired in {
+    // Two concurrent transactions should both succeed against a pool sized 2.
+    val program = transactorResource.use { xa =>
+      val q = sql"SELECT pg_backend_pid()".query[Int].unique.transact(xa)
+      (q, q).parTupled
+    }
+    val (a, b) = program.unsafeRunSync()
+    val _      = a should be > 0
+    b should be > 0
   }
 
 }

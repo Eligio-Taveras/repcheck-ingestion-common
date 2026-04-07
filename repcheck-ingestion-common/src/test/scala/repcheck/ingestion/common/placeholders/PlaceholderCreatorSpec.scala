@@ -1,100 +1,119 @@
 package repcheck.ingestion.common.placeholders
 
+import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import cats.effect.{IO, Ref}
+
+import doobie.implicits._
+import doobie.postgres.implicits._
+import doobie.util.transactor.Transactor
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import repcheck.ingestion.common.db.TransactorResource
+import repcheck.ingestion.common.testing.{DockerPostgresSpec, DockerRequired}
 import repcheck.shared.models.congress.dos.member.MemberDO
 
-class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers {
+class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers with DockerPostgresSpec {
 
   private val creator = new DefaultPlaceholderCreator[IO]
 
-  private def trackingRepo(
-    ref: Ref[IO, List[MemberDO]]
-  ): EntityRepository[IO, MemberDO] =
-    new EntityRepository[IO, MemberDO] {
-      override def insertIfNotExists(entity: MemberDO): IO[Unit] =
-        ref.update(entity :: _)
-    }
+  private val membersInsertSql: String =
+    """INSERT INTO members (
+      |  member_id, natural_key, first_name, last_name, direct_order_name, inverted_order_name,
+      |  honorific_name, birth_year, current_party, state, district, image_url, image_attribution,
+      |  official_url, update_date, created_at, updated_at
+      |) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      |ON CONFLICT (natural_key) DO NOTHING""".stripMargin
 
-  "PlaceholderCreator.ensureExists" should "create placeholder when entity is missing" in {
-    val program = for {
-      ref <- Ref.of[IO, List[MemberDO]](List.empty)
-      repo = trackingRepo(ref)
-      _        <- creator.ensureExists[MemberDO]("B000444", repo)
-      entities <- ref.get
-    } yield entities
-
-    val entities = program.unsafeRunSync()
-    val _        = entities should have size 1
-    val member   = entities.headOption.getOrElse(fail("Entity should have been inserted"))
-    val _        = member.naturalKey shouldBe "B000444"
-    val _        = member.memberId shouldBe 0L
-    val _        = member.firstName shouldBe None
-    member.lastName shouldBe None
-  }
-
-  it should "be a no-op when entity already exists (insertIfNotExists silently skips)" in {
-    val program = for {
-      callCountRef <- Ref.of[IO, Int](0)
-      repo = new EntityRepository[IO, MemberDO] {
-        override def insertIfNotExists(entity: MemberDO): IO[Unit] =
-          callCountRef.update(_ + 1)
+  private def withRepo[A](
+    block: (Transactor[IO], DoobieEntityRepository[IO, MemberDO]) => IO[A]
+  ): A =
+    TransactorResource
+      .makeTransactor[IO](
+        driverClassName = "org.postgresql.Driver",
+        url = jdbcUrl,
+        user = jdbcUser,
+        pass = jdbcPassword,
+        maxConnections = 4,
+      )
+      .use { xa =>
+        val repo = new DoobieEntityRepository[IO, MemberDO](xa, membersInsertSql)
+        sql"TRUNCATE TABLE members".update.run.transact(xa) >> block(xa, repo)
       }
-      _         <- creator.ensureExists[MemberDO]("B000444", repo)
-      _         <- creator.ensureExists[MemberDO]("B000444", repo)
-      callCount <- callCountRef.get
-    } yield callCount
+      .unsafeRunSync()
 
-    val callCount = program.unsafeRunSync()
-    // Both calls go through to the repository, which silently handles duplicates
-    callCount shouldBe 2
+  private def loadByKey(xa: Transactor[IO], key: String): IO[Option[MemberDO]] =
+    sql"""SELECT member_id, natural_key, first_name, last_name, direct_order_name, inverted_order_name,
+                 honorific_name, birth_year, current_party, state, district, image_url, image_attribution,
+                 official_url, update_date, created_at, updated_at
+          FROM members WHERE natural_key = $key"""
+      .query[MemberDO]
+      .option
+      .transact(xa)
+
+  private def countByKey(xa: Transactor[IO], key: String): IO[Int] =
+    sql"SELECT COUNT(*) FROM members WHERE natural_key = $key".query[Int].unique.transact(xa)
+
+  "PlaceholderCreator.ensureExists" should "insert a placeholder row when the entity is missing" taggedAs DockerRequired in {
+    withRepo { (xa, repo) =>
+      for {
+        _      <- creator.ensureExists[MemberDO]("B000444", repo)
+        loaded <- loadByKey(xa, "B000444")
+      } yield {
+        val member = loaded.getOrElse(fail("expected a row for B000444"))
+        val _      = member.naturalKey shouldBe "B000444"
+        val _      = member.firstName shouldBe None
+        member.lastName shouldBe None
+      }
+    }
   }
 
-  it should "be idempotent — calling twice is safe" in {
-    val program = for {
-      ref <- Ref.of[IO, List[MemberDO]](List.empty)
-      repo = trackingRepo(ref)
-      _        <- creator.ensureExists[MemberDO]("B000444", repo)
-      _        <- creator.ensureExists[MemberDO]("B000444", repo)
-      entities <- ref.get
-    } yield entities
-
-    val entities = program.unsafeRunSync()
-    // Both calls delegate to repository; the repository is responsible for idempotency
-    val _ = entities should have size 2
-    all(entities.map(_.naturalKey)) shouldBe "B000444"
+  it should "be a no-op when the entity already exists (ON CONFLICT silently skips)" taggedAs DockerRequired in {
+    withRepo { (xa, repo) =>
+      for {
+        _     <- creator.ensureExists[MemberDO]("B000444", repo)
+        _     <- creator.ensureExists[MemberDO]("B000444", repo)
+        count <- countByKey(xa, "B000444")
+      } yield count shouldBe 1
+    }
   }
 
-  it should "create placeholder with only natural key populated" in {
-    val program = for {
-      ref <- Ref.of[IO, List[MemberDO]](List.empty)
-      repo = trackingRepo(ref)
-      _        <- creator.ensureExists[MemberDO]("S000148", repo)
-      entities <- ref.get
-    } yield entities
+  it should "be idempotent — calling twice leaves a single row" taggedAs DockerRequired in {
+    withRepo { (xa, repo) =>
+      for {
+        _     <- creator.ensureExists[MemberDO]("S000148", repo)
+        _     <- creator.ensureExists[MemberDO]("S000148", repo)
+        count <- countByKey(xa, "S000148")
+      } yield count shouldBe 1
+    }
+  }
 
-    val entities = program.unsafeRunSync()
-    val member   = entities.headOption.getOrElse(fail("Entity should have been inserted"))
-    val _        = member.naturalKey shouldBe "S000148"
-    val _        = member.memberId shouldBe 0L
-    val _        = member.firstName shouldBe None
-    val _        = member.lastName shouldBe None
-    val _        = member.directOrderName shouldBe None
-    val _        = member.invertedOrderName shouldBe None
-    val _        = member.honorificName shouldBe None
-    val _        = member.birthYear shouldBe None
-    val _        = member.currentParty shouldBe None
-    val _        = member.state shouldBe None
-    val _        = member.district shouldBe None
-    val _        = member.imageUrl shouldBe None
-    val _        = member.imageAttribution shouldBe None
-    val _        = member.officialUrl shouldBe None
-    val _        = member.updateDate shouldBe None
-    val _        = member.createdAt shouldBe None
-    member.updatedAt shouldBe None
+  it should "create the placeholder with only the natural key populated" taggedAs DockerRequired in {
+    withRepo { (xa, repo) =>
+      for {
+        _      <- creator.ensureExists[MemberDO]("S000148", repo)
+        loaded <- loadByKey(xa, "S000148")
+      } yield {
+        val member = loaded.getOrElse(fail("expected a row for S000148"))
+        val _      = member.naturalKey shouldBe "S000148"
+        val _      = member.memberId shouldBe 0L
+        val _      = member.firstName shouldBe None
+        val _      = member.lastName shouldBe None
+        val _      = member.directOrderName shouldBe None
+        val _      = member.invertedOrderName shouldBe None
+        val _      = member.honorificName shouldBe None
+        val _      = member.birthYear shouldBe None
+        val _      = member.currentParty shouldBe None
+        val _      = member.state shouldBe None
+        val _      = member.district shouldBe None
+        val _      = member.imageUrl shouldBe None
+        val _      = member.imageAttribution shouldBe None
+        val _      = member.officialUrl shouldBe None
+        val _      = member.updateDate shouldBe None
+        val _      = member.createdAt shouldBe None
+        member.updatedAt shouldBe None
+      }
+    }
   }
 
 }
