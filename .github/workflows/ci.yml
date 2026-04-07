@@ -50,11 +50,21 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+          flags: unit
 
-      - name: Run DB-backed integration tests against AlloyDB Omni
+      - name: Run DB-backed integration tests against AlloyDB Omni with coverage
         # `dockerTest` is a build.sbt command alias that flips the testOptions filter to
         # INCLUDE only @DockerRequired specs. The default `sbt test` task above EXCLUDES them.
-        run: sbt dockerTest
+        # `coverage` / `coverageReport` are sbt commands wrapped around the alias so the
+        # integration suites contribute to overall coverage.
+        run: sbt coverage dockerTest coverageReport
+
+      - name: Upload Docker coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          flags: integration
 
   doc-generator:
     runs-on: ubuntu-latest
