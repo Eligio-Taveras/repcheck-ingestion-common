@@ -86,7 +86,11 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
     libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.2",
     libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.3",
     // Circe semi-auto derivation for large case classes
-    scalacOptions += "-Xmax-inlines:64"
+    scalacOptions += "-Xmax-inlines:64",
+    // Exclude DB-backed integration tests from `sbt test` by default — they require a local
+    // Docker daemon to start an AlloyDB Omni container. Use the `dockerTest` alias below to
+    // run them explicitly.
+    Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-l", "DockerRequired")
   )
 
 lazy val docGenerator = (project in file("doc-generator"))
@@ -103,3 +107,13 @@ lazy val docGenerator = (project in file("doc-generator"))
     // Exclude from coverage — utility project with no unit tests
     coverageEnabled := false
   )
+
+// `dockerTest` runs only the DB-backed integration tests against a local AlloyDB Omni
+// container. The default `Test / testOptions` exclude DockerRequired tests, so this alias
+// overrides those options for the duration of the run and then restores them.
+addCommandAlias(
+  "dockerTest",
+  "; set repcheckingestioncommon / Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-n\", \"DockerRequired\"))" +
+    "; repcheckingestioncommon / test" +
+    "; set repcheckingestioncommon / Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-l\", \"DockerRequired\"))",
+)
