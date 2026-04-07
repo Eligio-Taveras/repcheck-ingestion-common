@@ -87,7 +87,7 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
             val cursor = json.hcursor
             val items = cursor
               .downField("items")
-              .as[List[TestItem]](Decoder.decodeList(TestItem.decoder))
+              .as[List[TestItem]](using Decoder.decodeList(using TestItem.decoder))
               .getOrElse(List.empty)
             val totalCount =
               cursor.downField("pagination").downField("count").as[Int].getOrElse(0)
@@ -157,7 +157,7 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
     val params = FetchParams(pageSize = pageSize)
 
     client.fetchAll(params).compile.toList.asserting { items =>
-      items.size shouldBe 600
+      val _ = items.size shouldBe 600
       items.map(_.id) shouldBe (1 to 600).toList
     }
   }
@@ -173,7 +173,7 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
     val params = FetchParams(pageSize = pageSize)
 
     client.fetchAll(params).compile.toList.asserting { result =>
-      result.size shouldBe 100
+      val _ = result.size shouldBe 100
 
       val requests = wireMock.findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")))
       requests.forEach { req =>
@@ -234,7 +234,7 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
     client.fetchAll(params).compile.toList.asserting { _ =>
       val requests = wireMock.findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")))
       val firstReq = requests.get(0)
-      firstReq.queryParameter("fromDateTime").firstValue() shouldBe "2024-01-01T00:00:00Z"
+      val _        = firstReq.queryParameter("fromDateTime").firstValue() shouldBe "2024-01-01T00:00:00Z"
       firstReq.queryParameter("toDateTime").firstValue() shouldBe "2024-06-30T23:59:59Z"
     }
   }

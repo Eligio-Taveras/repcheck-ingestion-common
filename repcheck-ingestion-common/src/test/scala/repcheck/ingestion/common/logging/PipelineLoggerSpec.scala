@@ -36,9 +36,9 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.info(baseContext, "test message")
       lines         <- ref.get
     } yield {
-      lines should have size 1
+      val _    = lines should have size 1
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
-      json.hcursor.get[String]("runId").toOption shouldBe Some("run-123")
+      val _    = json.hcursor.get[String]("runId").toOption shouldBe Some("run-123")
       json.hcursor.get[String]("stepName").toOption shouldBe Some("test-step")
     }
   }
@@ -95,7 +95,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       lines         <- ref.get
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
-      json.hcursor.get[String]("foo").toOption shouldBe Some("bar")
+      val _    = json.hcursor.get[String]("foo").toOption shouldBe Some("bar")
       json.hcursor.get[String]("baz").toOption shouldBe Some("qux")
     }
   }
@@ -111,7 +111,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.debug(baseContext, "debug test")
       lines         <- ref.get
     } yield {
-      lines should have size 4
+      val _ = lines should have size 4
       lines.foreach(line => parse(line).isRight shouldBe true)
     }
   }
@@ -125,10 +125,10 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       lines         <- ref.get
     } yield {
       val line = lines.headOption.getOrElse("")
-      line should include("[INFO]")
-      line should include(s"[$testPipeline]")
-      line should include("[run-123/test-step]")
-      line should include("human readable")
+      val _    = line should include("[INFO]")
+      val _    = line should include(s"[$testPipeline]")
+      val _    = line should include("[run-123/test-step]")
+      val _    = line should include("human readable")
       // Should NOT be valid JSON
       parse(line).isLeft shouldBe true
     }
@@ -155,7 +155,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       lines         <- ref.get
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
-      json.hcursor.get[String]("timestamp").toOption should not be empty
+      val _    = json.hcursor.get[String]("timestamp").toOption should not be empty
       json.hcursor.get[String]("level").toOption shouldBe Some("WARN")
     }
   }
@@ -183,7 +183,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.error(baseContext, "should also appear", None)
       lines         <- ref.get
     } yield {
-      lines should have size 2
+      val _      = lines should have size 2
       val levels = lines.flatMap(line => parse(line).toOption.flatMap(_.hcursor.get[String]("level").toOption))
       levels should contain theSameElementsAs List("WARN", "ERROR")
     }
@@ -220,7 +220,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       _             <- logger.debug(baseContext, "pipeline check")
       lines         <- ref.get
     } yield {
-      lines should have size 4
+      val _ = lines should have size 4
       lines.foreach { line =>
         val json = parse(line).fold(e => fail(s"expected valid JSON but got: $e"), identity)
         json.hcursor.get[String]("pipeline").toOption shouldBe Some(testPipeline)
@@ -249,8 +249,8 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       lines         <- ref.get
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
-      json.hcursor.get[String]("runId").toOption shouldBe Some("pre-init")
-      json.hcursor.get[String]("stepName").toOption shouldBe Some("bootstrap")
+      val _    = json.hcursor.get[String]("runId").toOption shouldBe Some("pre-init")
+      val _    = json.hcursor.get[String]("stepName").toOption shouldBe Some("bootstrap")
       json.hcursor.get[String]("message").toOption shouldBe Some("Loading config from args")
     }
   }
@@ -264,7 +264,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       lines         <- ref.get
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
-      json.hcursor.get[String]("error").toOption shouldBe Some("db connection lost")
+      val _    = json.hcursor.get[String]("error").toOption shouldBe Some("db connection lost")
       json.hcursor.get[String]("level").toOption shouldBe Some("ERROR")
     }
   }
@@ -325,14 +325,14 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
       val c    = json.hcursor
-      c.get[String]("timestamp").isRight shouldBe true
-      c.get[String]("level").toOption shouldBe Some("INFO")
-      c.get[String]("message").toOption shouldBe Some("Processing bill 118-hr-1234")
-      c.get[String]("runId").toOption shouldBe Some("bill-ingestion-2024-01-15-a1b2c3d4")
-      c.get[String]("stepName").toOption shouldBe Some("bill-metadata-ingestion")
-      c.get[String]("correlationId").toOption shouldBe Some("550e8400-e29b-41d4-a716-446655440000")
-      c.get[String]("entityId").toOption shouldBe Some("118-hr-1234")
-      c.get[String]("pipeline").toOption shouldBe Some(testPipeline)
+      val _    = c.get[String]("timestamp").isRight shouldBe true
+      val _    = c.get[String]("level").toOption shouldBe Some("INFO")
+      val _    = c.get[String]("message").toOption shouldBe Some("Processing bill 118-hr-1234")
+      val _    = c.get[String]("runId").toOption shouldBe Some("bill-ingestion-2024-01-15-a1b2c3d4")
+      val _    = c.get[String]("stepName").toOption shouldBe Some("bill-metadata-ingestion")
+      val _    = c.get[String]("correlationId").toOption shouldBe Some("550e8400-e29b-41d4-a716-446655440000")
+      val _    = c.get[String]("entityId").toOption shouldBe Some("118-hr-1234")
+      val _    = c.get[String]("pipeline").toOption shouldBe Some(testPipeline)
       c.get[String]("congress").toOption shouldBe Some("118")
     }
   }
@@ -359,7 +359,7 @@ class PipelineLoggerSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       lines         <- ref.get
     } yield {
       val json = parse(lines.headOption.getOrElse("")).fold(e => fail(s"expected valid JSON but got: $e"), identity)
-      json.hcursor.get[String]("level").toOption shouldBe Some("ERROR")
+      val _    = json.hcursor.get[String]("level").toOption shouldBe Some("ERROR")
       json.hcursor.get[String]("error").toOption shouldBe None
     }
   }

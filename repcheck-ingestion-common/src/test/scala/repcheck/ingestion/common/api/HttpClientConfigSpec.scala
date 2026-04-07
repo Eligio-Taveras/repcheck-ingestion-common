@@ -11,9 +11,9 @@ class HttpClientConfigSpec extends AnyFlatSpec with Matchers {
 
   "HttpClientConfig" should "have sensible defaults" in {
     val config = HttpClientConfig()
-    config.connectTimeout shouldBe 10.seconds
-    config.requestTimeout shouldBe 30.seconds
-    config.maxTotalConnections shouldBe 10
+    val _      = config.connectTimeout shouldBe 10.seconds
+    val _      = config.requestTimeout shouldBe 30.seconds
+    val _      = config.maxTotalConnections shouldBe 10
     config.idleTimeout shouldBe 60.seconds
   }
 
@@ -27,9 +27,9 @@ class HttpClientConfigSpec extends AnyFlatSpec with Matchers {
         |""".stripMargin
 
     val config = ConfigSource.string(hocon).loadOrThrow[HttpClientConfig]
-    config.connectTimeout shouldBe 5.seconds
-    config.requestTimeout shouldBe 15.seconds
-    config.maxTotalConnections shouldBe 20
+    val _      = config.connectTimeout shouldBe 5.seconds
+    val _      = config.requestTimeout shouldBe 15.seconds
+    val _      = config.maxTotalConnections shouldBe 20
     config.idleTimeout shouldBe 45.seconds
   }
 

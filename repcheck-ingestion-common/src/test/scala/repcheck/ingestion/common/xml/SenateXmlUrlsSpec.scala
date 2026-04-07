@@ -38,10 +38,10 @@ class SenateXmlUrlsSpec extends AnyFlatSpec with Matchers {
   }
 
   "all URLs" should "start with https://" in {
-    SenateXmlUrls.rollCallVote(118, 1, 1) should startWith("https://")
-    SenateXmlUrls.rollCallIndex(118, 1) should startWith("https://")
-    SenateXmlUrls.memberContactInfo should startWith("https://")
-    SenateXmlUrls.committeeMemberData should startWith("https://")
+    val _ = SenateXmlUrls.rollCallVote(118, 1, 1) should startWith("https://")
+    val _ = SenateXmlUrls.rollCallIndex(118, 1) should startWith("https://")
+    val _ = SenateXmlUrls.memberContactInfo should startWith("https://")
+    val _ = SenateXmlUrls.committeeMemberData should startWith("https://")
     SenateXmlUrls.senatorLookup should startWith("https://")
   }
 

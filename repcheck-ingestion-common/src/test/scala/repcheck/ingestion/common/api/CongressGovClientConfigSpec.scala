@@ -11,11 +11,11 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
 
   "CongressGovClientConfig" should "have sensible Scala defaults" in {
     val config = CongressGovClientConfig(apiKey = "test-key", baseUrl = "https://api.congress.gov/v3")
-    config.apiKey shouldBe "test-key"
-    config.baseUrl shouldBe "https://api.congress.gov/v3"
-    config.pageSize shouldBe 250
-    config.pageDelay shouldBe Duration.Zero
-    config.retry.maxRetries shouldBe 3
+    val _      = config.apiKey shouldBe "test-key"
+    val _      = config.baseUrl shouldBe "https://api.congress.gov/v3"
+    val _      = config.pageSize shouldBe 250
+    val _      = config.pageDelay shouldBe Duration.Zero
+    val _      = config.retry.maxRetries shouldBe 3
     config.http.connectTimeout shouldBe 10.seconds
   }
 
@@ -42,17 +42,17 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
 
     val config = ConfigSource.string(hocon).loadOrThrow[CongressGovClientConfig]
 
-    config.apiKey shouldBe "test-api-key-123"
-    config.baseUrl shouldBe "https://custom.api.com/v3"
-    config.pageSize shouldBe 100
-    config.pageDelay shouldBe 200.millis
-    config.retry.maxRetries shouldBe 5
-    config.retry.initialBackoffMs shouldBe 100L
-    config.retry.maxBackoffMs shouldBe 10000L
-    config.retry.backoffMultiplier shouldBe 3.0
-    config.http.connectTimeout shouldBe 5.seconds
-    config.http.requestTimeout shouldBe 15.seconds
-    config.http.maxTotalConnections shouldBe 20
+    val _ = config.apiKey shouldBe "test-api-key-123"
+    val _ = config.baseUrl shouldBe "https://custom.api.com/v3"
+    val _ = config.pageSize shouldBe 100
+    val _ = config.pageDelay shouldBe 200.millis
+    val _ = config.retry.maxRetries shouldBe 5
+    val _ = config.retry.initialBackoffMs shouldBe 100L
+    val _ = config.retry.maxBackoffMs shouldBe 10000L
+    val _ = config.retry.backoffMultiplier shouldBe 3.0
+    val _ = config.http.connectTimeout shouldBe 5.seconds
+    val _ = config.http.requestTimeout shouldBe 15.seconds
+    val _ = config.http.maxTotalConnections shouldBe 20
     config.http.idleTimeout shouldBe 30.seconds
   }
 
@@ -79,14 +79,14 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
 
     val config = ConfigSource.string(hocon).loadOrThrow[CongressGovClientConfig]
 
-    config.apiKey shouldBe "minimal-key"
-    config.baseUrl shouldBe "https://api.congress.gov/v3"
-    config.pageSize shouldBe 250
-    config.pageDelay shouldBe Duration.Zero
-    config.retry.maxRetries shouldBe 3
-    config.http.connectTimeout shouldBe 10.seconds
-    config.http.requestTimeout shouldBe 30.seconds
-    config.http.maxTotalConnections shouldBe 10
+    val _ = config.apiKey shouldBe "minimal-key"
+    val _ = config.baseUrl shouldBe "https://api.congress.gov/v3"
+    val _ = config.pageSize shouldBe 250
+    val _ = config.pageDelay shouldBe Duration.Zero
+    val _ = config.retry.maxRetries shouldBe 3
+    val _ = config.http.connectTimeout shouldBe 10.seconds
+    val _ = config.http.requestTimeout shouldBe 30.seconds
+    val _ = config.http.maxTotalConnections shouldBe 10
     config.http.idleTimeout shouldBe 60.seconds
   }
 

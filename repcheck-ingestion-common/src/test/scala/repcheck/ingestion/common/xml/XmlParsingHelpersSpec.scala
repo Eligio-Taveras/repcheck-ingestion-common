@@ -19,7 +19,7 @@ class XmlParsingHelpersSpec extends AnyFlatSpec with Matchers {
   it should "return Left(XmlFieldMissing) for absent tag" in {
     val xml    = <root></root>
     val result = XmlParsingHelpers.text(xml, "name")
-    result.isLeft shouldBe true
+    val _      = result.isLeft shouldBe true
     result.fold(identity, _ => fail("expected Left but got Right")) shouldBe a[XmlFieldMissing]
   }
 

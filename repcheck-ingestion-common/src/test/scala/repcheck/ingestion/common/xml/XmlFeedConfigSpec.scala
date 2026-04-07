@@ -9,21 +9,21 @@ class XmlFeedConfigSpec extends AnyFlatSpec with Matchers {
 
   "XmlFeedConfig" should "have sensible defaults" in {
     val config = XmlFeedConfig()
-    config.retry.maxRetries shouldBe 3
-    config.retry.initialBackoffMs shouldBe 200L
-    config.retry.maxBackoffMs shouldBe 15000L
-    config.retry.backoffMultiplier shouldBe 2.0
-    config.http.connectTimeoutMs shouldBe 5000L
-    config.http.idleTimeoutMs shouldBe 60000L
-    config.http.requestTimeoutMs shouldBe 30000L
+    val _      = config.retry.maxRetries shouldBe 3
+    val _      = config.retry.initialBackoffMs shouldBe 200L
+    val _      = config.retry.maxBackoffMs shouldBe 15000L
+    val _      = config.retry.backoffMultiplier shouldBe 2.0
+    val _      = config.http.connectTimeoutMs shouldBe 5000L
+    val _      = config.http.idleTimeoutMs shouldBe 60000L
+    val _      = config.http.requestTimeoutMs shouldBe 30000L
     config.http.maxTotalConnections shouldBe 10
   }
 
   "HttpClientConfig (xml)" should "have sensible defaults" in {
     val config = HttpClientConfig()
-    config.connectTimeoutMs shouldBe 5000L
-    config.idleTimeoutMs shouldBe 60000L
-    config.requestTimeoutMs shouldBe 30000L
+    val _      = config.connectTimeoutMs shouldBe 5000L
+    val _      = config.idleTimeoutMs shouldBe 60000L
+    val _      = config.requestTimeoutMs shouldBe 30000L
     config.maxTotalConnections shouldBe 10
   }
 
@@ -45,7 +45,7 @@ class XmlFeedConfigSpec extends AnyFlatSpec with Matchers {
         |""".stripMargin
 
     val config = ConfigSource.string(hocon).loadOrThrow[XmlFeedConfig]
-    config.retry.maxRetries shouldBe 5
+    val _      = config.retry.maxRetries shouldBe 5
     config.http.maxTotalConnections shouldBe 20
   }
 

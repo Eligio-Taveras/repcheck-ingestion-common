@@ -9,11 +9,11 @@ class FetchParamsSpec extends AnyFlatSpec with Matchers {
 
   "FetchParams" should "have sensible defaults" in {
     val params = FetchParams()
-    params.congress shouldBe None
-    params.fromDateTime shouldBe None
-    params.toDateTime shouldBe None
-    params.sort shouldBe SortOrder.UpdateDateDesc
-    params.pageSize shouldBe 250
+    val _      = params.congress shouldBe None
+    val _      = params.fromDateTime shouldBe None
+    val _      = params.toDateTime shouldBe None
+    val _      = params.sort shouldBe SortOrder.UpdateDateDesc
+    val _      = params.pageSize shouldBe 250
     params.offset shouldBe 0
   }
 
@@ -28,18 +28,18 @@ class FetchParamsSpec extends AnyFlatSpec with Matchers {
       pageSize = 100,
       offset = 50,
     )
-    params.congress shouldBe Some(118)
-    params.fromDateTime shouldBe Some(from)
-    params.toDateTime shouldBe Some(to)
-    params.sort shouldBe SortOrder.UpdateDateAsc
-    params.pageSize shouldBe 100
+    val _ = params.congress shouldBe Some(118)
+    val _ = params.fromDateTime shouldBe Some(from)
+    val _ = params.toDateTime shouldBe Some(to)
+    val _ = params.sort shouldBe SortOrder.UpdateDateAsc
+    val _ = params.pageSize shouldBe 100
     params.offset shouldBe 50
   }
 
   it should "support copy with modified offset" in {
     val params = FetchParams(pageSize = 100, offset = 0)
     val next   = params.copy(offset = params.offset + params.pageSize)
-    next.offset shouldBe 100
+    val _      = next.offset shouldBe 100
     next.pageSize shouldBe 100
   }
 

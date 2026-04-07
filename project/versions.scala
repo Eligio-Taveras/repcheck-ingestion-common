@@ -10,4 +10,5 @@ object Versions {
   val logbackVersion    = "1.5.32"
   val wiremockVersion   = "3.13.2"
   val scalaXmlVersion   = "2.4.0"
+  val difflicious       = "0.4.4"
 }
