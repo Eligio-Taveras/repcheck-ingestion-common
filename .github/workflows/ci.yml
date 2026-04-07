@@ -57,7 +57,9 @@ jobs:
         # INCLUDE only @DockerRequired specs. The default `sbt test` task above EXCLUDES them.
         # `coverage` / `coverageReport` are sbt commands wrapped around the alias so the
         # integration suites contribute to overall coverage.
-        run: sbt coverage dockerTest coverageReport
+        # `clean` ensures scoverage measurement data from the non-Docker run is cleared so
+        # the integration-flag report on Codecov reflects only the DB-backed suites.
+        run: sbt clean coverage dockerTest coverageReport
 
       - name: Upload Docker coverage reports to Codecov
         uses: codecov/codecov-action@v5
