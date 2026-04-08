@@ -2,6 +2,7 @@ import org.typelevel.scalacoptions.ScalacOption
 import sbt.Keys.libraryDependencies
 import sbt.Def
 import Dependencies.*
+import com.repcheck.sbt.ExceptionUniquenessPlugin.autoImport.exceptionUniquenessRootPackages
 
 val isScala212: Def.Initialize[Boolean] = Def.setting {
   VersionNumber(scalaVersion.value).matchesSemVer(SemanticSelector("2.12.x"))
@@ -71,9 +72,11 @@ lazy val root = (project in file("."))
   )
 
 lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common"))
+  .enablePlugins(com.repcheck.sbt.ExceptionUniquenessPlugin)
   .settings(
     commonSettings,
     name := "repcheck-ingestion-common",
+    exceptionUniquenessRootPackages := Seq("repcheck.ingestion"),
     libraryDependencies ++= http4sEmber ++ circe ++ pureConfig ++ fs2
       ++ catsEffect ++ testDeps
       ++ doobie
