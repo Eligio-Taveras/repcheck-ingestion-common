@@ -3,19 +3,18 @@
 --
 -- This is NOT the production schema — it is a minimal subset shaped to exercise the generic
 -- DoobieEntityRepository and the WorkflowStateUpdater against real Postgres semantics
--- (ON CONFLICT, transactional updates, primary keys).
+-- (ON CONFLICT, transactional updates, primary keys, BIGSERIAL auto-increment PKs).
 --
 -- Two tables:
 --   1. members            — representative entity for EntityRepositorySpec / PlaceholderCreatorSpec.
---                           natural_key is the primary key (rather than member_id) so a placeholder
---                           with member_id = 0 can be inserted multiple times under different keys
---                           without colliding on the surrogate column.
+--                           id is a BIGSERIAL auto-increment PK; natural_key has a UNIQUE constraint
+--                           so ON CONFLICT (natural_key) DO NOTHING works for placeholder dedup.
 --   2. workflow_run_steps — execution-state table for WorkflowStateUpdaterSpec, matching the columns
 --                           the production code reads/writes.
 
 CREATE TABLE IF NOT EXISTS members (
-    member_id           BIGINT       NOT NULL DEFAULT 0,
-    natural_key         VARCHAR(255) NOT NULL,
+    id                  BIGSERIAL    PRIMARY KEY,
+    natural_key         TEXT         UNIQUE NOT NULL,
     first_name          TEXT,
     last_name           TEXT,
     direct_order_name   TEXT,
@@ -30,8 +29,7 @@ CREATE TABLE IF NOT EXISTS members (
     official_url        TEXT,
     update_date         TEXT,
     created_at          TIMESTAMPTZ,
-    updated_at          TIMESTAMPTZ,
-    PRIMARY KEY (natural_key)
+    updated_at          TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS workflow_run_steps (
