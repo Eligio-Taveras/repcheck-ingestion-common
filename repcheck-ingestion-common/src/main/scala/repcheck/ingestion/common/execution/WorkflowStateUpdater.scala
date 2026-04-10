@@ -1,7 +1,6 @@
 package repcheck.ingestion.common.execution
 
 import java.time.Instant
-import java.util.UUID
 
 import scala.util.control.NonFatal
 
@@ -26,9 +25,9 @@ import repcheck.pipeline.models.workflow.state.WorkflowStepStatus
  * or updates the existing row in place, which matches the spec's requirement that each step has a single row with
  * status updated in place across retries.
  *
- * `workflow_run_id` is a `UUID` column in AlloyDB/Postgres. The trait signature uses `String` because pipeline
- * applications typically receive the run ID as a CLI argument; this implementation parses it once per call and raises
- * [[RunIdMissing]] if the string is not a valid UUID, keeping the caller free of UUID plumbing.
+ * `workflow_run_id` is a `BIGINT` column in AlloyDB/Postgres (post PK standardization). The trait signature uses
+ * `String` because pipeline applications typically receive the run ID as a CLI argument; this implementation parses it
+ * once per call and raises [[RunIdMissing]] if the string is not a valid Long, keeping the caller free of ID plumbing.
  *
  * The class is non-final on purpose: there is exactly one production implementation, but tests and pipelines that need
  * to inject alternate behavior can subclass and override individual methods.
@@ -50,12 +49,12 @@ class WorkflowStateUpdater[F[_]: MonadCancelThrow](
   // input. The double quotes force identifier parsing.
   private val table: Fragment = Fragment.const(s""""${Tables.WorkflowRunSteps}"""")
 
-  private def parseRunId(runId: String): F[UUID] =
-    try MonadCancelThrow[F].pure(UUID.fromString(runId))
+  private def parseRunId(runId: String): F[Long] =
+    try MonadCancelThrow[F].pure(runId.toLong)
     catch {
       case NonFatal(ex) =>
-        MonadCancelThrow[F].raiseError[UUID](
-          RunIdMissing(s"'$runId' is not a valid UUID: ${ex.getMessage}")
+        MonadCancelThrow[F].raiseError[Long](
+          RunIdMissing(s"'$runId' is not a valid run ID: ${ex.getMessage}")
         )
     }
 
@@ -64,14 +63,14 @@ class WorkflowStateUpdater[F[_]: MonadCancelThrow](
    * new row inserted. Sets `status = Running`, `started_at = now`, and `max_retries` to the configured value.
    */
   def recordStepStarted(runId: String, stepName: String): F[Unit] =
-    parseRunId(runId).flatMap { uuid =>
+    parseRunId(runId).flatMap { id =>
       val now                         = Instant.now()
       val running: WorkflowStepStatus = WorkflowStepStatus.Running
       val maxRetries                  = config.maxRetries
       val sql =
         fr"""INSERT INTO """ ++ table ++
           fr"""(workflow_run_id, step_name, status, retry_count, max_retries, started_at, created_at, updated_at)
-              VALUES ($uuid, $stepName, $running, 0, $maxRetries, $now, $now, $now)
+              VALUES ($id, $stepName, $running, 0, $maxRetries, $now, $now, $now)
               ON CONFLICT (workflow_run_id, step_name) DO UPDATE
               SET status = EXCLUDED.status, started_at = EXCLUDED.started_at, updated_at = EXCLUDED.updated_at"""
       sql.update.run.transact(xa).void
@@ -79,25 +78,25 @@ class WorkflowStateUpdater[F[_]: MonadCancelThrow](
 
   /** Mark a step as completed. Sets `status = Completed` and `completed_at = now`. */
   def recordStepCompleted(runId: String, stepName: String): F[Unit] =
-    parseRunId(runId).flatMap { uuid =>
+    parseRunId(runId).flatMap { id =>
       val now                           = Instant.now()
       val completed: WorkflowStepStatus = WorkflowStepStatus.Completed
       val sql =
         fr"""UPDATE """ ++ table ++
           fr"""SET status = $completed, completed_at = $now, updated_at = $now
-              WHERE workflow_run_id = $uuid AND step_name = $stepName"""
+              WHERE workflow_run_id = $id AND step_name = $stepName"""
       sql.update.run.transact(xa).void
     }
 
   /** Mark a step as failed. Sets `status = Failed`, `completed_at = now`, and `error_message = error`. */
   def recordStepFailed(runId: String, stepName: String, error: String): F[Unit] =
-    parseRunId(runId).flatMap { uuid =>
+    parseRunId(runId).flatMap { id =>
       val now                        = Instant.now()
       val failed: WorkflowStepStatus = WorkflowStepStatus.Failed
       val sql =
         fr"""UPDATE """ ++ table ++
           fr"""SET status = $failed, completed_at = $now, updated_at = $now, error_message = $error
-              WHERE workflow_run_id = $uuid AND step_name = $stepName"""
+              WHERE workflow_run_id = $id AND step_name = $stepName"""
       sql.update.run.transact(xa).void
     }
 
@@ -106,15 +105,15 @@ class WorkflowStateUpdater[F[_]: MonadCancelThrow](
    * message or mark the step permanently failed.
    */
   def incrementRetryCount(runId: String, stepName: String): F[Int] =
-    parseRunId(runId).flatMap { uuid =>
+    parseRunId(runId).flatMap { id =>
       val now = Instant.now()
       val sql =
         fr"""UPDATE """ ++ table ++
           fr"""SET retry_count = retry_count + 1, updated_at = $now
-              WHERE workflow_run_id = $uuid AND step_name = $stepName"""
+              WHERE workflow_run_id = $id AND step_name = $stepName"""
       for {
         _     <- sql.update.run.transact(xa)
-        count <- getRetryCountInternal(uuid, stepName)
+        count <- getRetryCountInternal(id, stepName)
       } yield count
     }
 
@@ -123,12 +122,12 @@ class WorkflowStateUpdater[F[_]: MonadCancelThrow](
    * has never been started.
    */
   def getRetryCount(runId: String, stepName: String): F[Int] =
-    parseRunId(runId).flatMap(uuid => getRetryCountInternal(uuid, stepName))
+    parseRunId(runId).flatMap(id => getRetryCountInternal(id, stepName))
 
-  private def getRetryCountInternal(uuid: UUID, stepName: String): F[Int] = {
+  private def getRetryCountInternal(id: Long, stepName: String): F[Int] = {
     val sql =
       fr"""SELECT retry_count FROM """ ++ table ++
-        fr"""WHERE workflow_run_id = $uuid AND step_name = $stepName"""
+        fr"""WHERE workflow_run_id = $id AND step_name = $stepName"""
     sql.query[Int].option.transact(xa).map(_.getOrElse(0))
   }
 
