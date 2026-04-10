@@ -87,9 +87,9 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
       ++ diff
     ,
     libraryDependencies += "com.h2database" % "h2" % "2.2.224" % Test,
-    libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.8",
-    libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.9",
-    libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.8" % Test,
+    libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.9",
+    libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.10",
+    libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.9" % Test,
     // Circe semi-auto derivation for large case classes
     scalacOptions += "-Xmax-inlines:64",
     // Exclude DB-backed integration tests from `sbt test` by default — they require a local
@@ -103,8 +103,8 @@ lazy val docGenerator = (project in file("doc-generator"))
     commonSettings,
     libraryDependencies ++= Seq(
       "com.anthropic" % "anthropic-java" % "2.18.0",
-      "org.typelevel" %% "cats-effect" % "3.5.4",
-      "ch.qos.logback" % "logback-classic" % "1.5.6"
+      "org.typelevel" %% "cats-effect" % "3.7.0",
+      "ch.qos.logback" % "logback-classic" % "1.5.32"
     ),
     // Exclude WartRemover for this utility project — uses Java SDK patterns
     wartremoverErrors := Seq.empty,
