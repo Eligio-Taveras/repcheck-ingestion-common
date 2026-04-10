@@ -4,7 +4,6 @@ import java.sql.{Connection, DriverManager}
 import java.util.UUID
 
 import scala.annotation.tailrec
-import scala.io.Source
 import scala.sys.process._
 import scala.util.Try
 
@@ -12,6 +11,7 @@ import cats.effect.unsafe.implicits.global
 import cats.effect.{IO, Resource}
 
 import org.scalatest.{BeforeAndAfterAll, Suite, Tag}
+import repcheck.db.migrations.MigrationRunner
 
 /**
  * Immutable AlloyDB Omni container info returned by [[DockerPostgres.resource]].
@@ -26,9 +26,8 @@ final case class PostgresContainerInfo(jdbcUrl: String, user: String, password: 
 /**
  * Cats Effect Resource that manages an AlloyDB Omni Docker container lifecycle for ingestion-common tests.
  *
- * This is a vendored, slimmed-down version of the helper used in repcheck/votr/db-migrations. It is intentionally
- * standalone (no Liquibase dependency) — instead of running a YAML changelog, it executes raw SQL files from the test
- * resources at `db/migrations/`.
+ * Delegates to `repcheck-db-migrations-runner` for Liquibase-based migration execution, ensuring test schemas match
+ * production exactly.
  *
  * Uses the Docker CLI directly rather than Testcontainers to avoid the API version incompatibility between docker-java
  * (v1.32) and Docker 29+ (minimum v1.40).
@@ -147,7 +146,7 @@ object DockerPostgres {
   private def applyMigrations(port: Int): Unit = {
     val conn = connectWithRetry(port, maxConnectAttempts)
     try
-      SqlMigrationRunner.runAll(conn)
+      MigrationRunner.migrate(conn)
     finally conn.close()
   }
 
@@ -170,40 +169,6 @@ object DockerPostgres {
       case scala.util.Failure(ex) =>
         sys.error(s"Failed to connect to PostgreSQL after $maxConnectAttempts attempts: ${ex.getMessage}")
     }
-  }
-
-}
-
-/**
- * Loads SQL files from the test classpath under `db/migrations/` and runs them against a JDBC connection in
- * lexicographic order.
- *
- * The file list is enumerated explicitly (rather than scanned from the classpath) so the order is deterministic and
- * does not depend on JAR walking. Add new migrations by creating the file under `src/test/resources/db/migrations/` and
- * appending its name to [[migrationFiles]].
- */
-object SqlMigrationRunner {
-
-  /** Ordered list of SQL files to apply. New migrations append to the end. */
-  val migrationFiles: List[String] = List(
-    "db/migrations/V001__init.sql"
-  )
-
-  def runAll(connection: Connection): Unit =
-    migrationFiles.foreach(name => runFile(connection, name))
-
-  private def runFile(connection: Connection, resourcePath: String): Unit = {
-    val stream = Option(getClass.getClassLoader.getResourceAsStream(resourcePath))
-      .getOrElse(sys.error(s"Migration file not found on test classpath: $resourcePath"))
-    val sql =
-      try Source.fromInputStream(stream, "UTF-8").mkString
-      finally stream.close()
-
-    val stmt = connection.createStatement()
-    try {
-      val _ = stmt.execute(sql)
-      ()
-    } finally stmt.close()
   }
 
 }
@@ -238,7 +203,7 @@ object SharedDockerPostgres {
 }
 
 /**
- * Mix-in trait for ScalaTest suites that need an AlloyDB Omni database with the ingestion-common test schema applied.
+ * Mix-in trait for ScalaTest suites that need an AlloyDB Omni database with the full production schema applied.
  *
  * Backed by [[SharedDockerPostgres]] — all DB-backed specs in the same JVM share a single container. Each spec is
  * responsible for truncating any tables it writes to so its tests do not see leftover state from other suites.

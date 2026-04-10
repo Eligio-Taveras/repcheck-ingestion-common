@@ -1,12 +1,9 @@
 package repcheck.ingestion.common.execution
 
-import java.util.UUID
-
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 
 import doobie.implicits._
-import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 
 import org.scalatest.flatspec.AnyFlatSpec
@@ -19,7 +16,13 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
 
   private val testConfig = PipelineFailureHandlerConfig(maxRetries = 3)
 
-  private def withFixture[A](block: (Transactor[IO], WorkflowStateUpdater[IO]) => IO[A]): A =
+  /** Insert a parent workflow_runs row and return its auto-generated id. */
+  private def createWorkflowRun(xa: Transactor[IO], name: String): IO[Long] =
+    sql"""INSERT INTO workflow_runs (workflow_name, status, trigger) VALUES ($name, 'running', 'test')""".update
+      .withUniqueGeneratedKeys[Long]("id")
+      .transact(xa)
+
+  private def withFixture[A](block: (Transactor[IO], WorkflowStateUpdater[IO], Long) => IO[A]): A =
     TransactorResource
       .makeTransactor[IO](
         driverClassName = "org.postgresql.Driver",
@@ -29,41 +32,41 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
         maxConnections = 4,
       )
       .use { xa =>
-        // Each spec runs in isolation by truncating the table up front. The table is created once
-        // by the migration applied during DockerPostgresSpec startup.
-        sql"TRUNCATE TABLE workflow_run_steps".update.run.transact(xa) >>
-          block(xa, new WorkflowStateUpdater[IO](xa, testConfig))
+        for {
+          _      <- sql"TRUNCATE TABLE workflow_run_steps, workflow_runs CASCADE".update.run.transact(xa)
+          runId  <- createWorkflowRun(xa, "test-workflow")
+          result <- block(xa, new WorkflowStateUpdater[IO](xa, testConfig), runId)
+        } yield result
       }
       .unsafeRunSync()
 
-  private def readStatus(xa: Transactor[IO], runId: UUID, step: String): IO[Option[String]] =
+  private def readStatus(xa: Transactor[IO], runId: Long, step: String): IO[Option[String]] =
     sql"""SELECT status FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
       .query[String]
       .option
       .transact(xa)
 
-  private def readCompletedAtPresent(xa: Transactor[IO], runId: UUID, step: String): IO[Boolean] =
+  private def readCompletedAtPresent(xa: Transactor[IO], runId: Long, step: String): IO[Boolean] =
     sql"""SELECT (completed_at IS NOT NULL) FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
       .query[Boolean]
       .unique
       .transact(xa)
 
-  private def readErrorMessage(xa: Transactor[IO], runId: UUID, step: String): IO[Option[String]] =
+  private def readErrorMessage(xa: Transactor[IO], runId: Long, step: String): IO[Option[String]] =
     sql"""SELECT error_message FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
       .query[Option[String]]
       .unique
       .transact(xa)
 
-  private def countRows(xa: Transactor[IO], runId: UUID, step: String): IO[Int] =
+  private def countRows(xa: Transactor[IO], runId: Long, step: String): IO[Int] =
     sql"""SELECT COUNT(*) FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
       .query[Int]
       .unique
       .transact(xa)
 
   "recordStepStarted" should "insert a new row with status Running" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val step  = "members-pipeline"
-    withFixture { (xa, updater) =>
+    withFixture { (xa, updater, runId) =>
+      val step = "members-pipeline"
       for {
         _      <- updater.recordStepStarted(runId.toString, step)
         status <- readStatus(xa, runId, step)
@@ -72,9 +75,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   it should "be idempotent on a retry — ON CONFLICT updates in place, no duplicate rows" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val step  = "votes-pipeline"
-    withFixture { (xa, updater) =>
+    withFixture { (xa, updater, runId) =>
+      val step = "votes-pipeline"
       for {
         _     <- updater.recordStepStarted(runId.toString, step)
         _     <- updater.recordStepStarted(runId.toString, step)
@@ -84,9 +86,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "recordStepCompleted" should "update status to Completed and set completed_at" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val step  = "bills-pipeline"
-    withFixture { (xa, updater) =>
+    withFixture { (xa, updater, runId) =>
+      val step = "bills-pipeline"
       for {
         _              <- updater.recordStepStarted(runId.toString, step)
         _              <- updater.recordStepCompleted(runId.toString, step)
@@ -100,9 +101,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "recordStepFailed" should "update status to Failed and set error_message" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val step  = "amendments-pipeline"
-    withFixture { (xa, updater) =>
+    withFixture { (xa, updater, runId) =>
+      val step = "amendments-pipeline"
       for {
         _            <- updater.recordStepStarted(runId.toString, step)
         _            <- updater.recordStepFailed(runId.toString, step, "connection timeout")
@@ -116,9 +116,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "incrementRetryCount" should "increment starting from 0 and return the new count" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val step  = "members-pipeline"
-    withFixture { (_, updater) =>
+    withFixture { (_, updater, runId) =>
+      val step = "members-pipeline"
       for {
         _     <- updater.recordStepStarted(runId.toString, step)
         one   <- updater.incrementRetryCount(runId.toString, step)
@@ -133,14 +132,12 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "getRetryCount" should "return 0 when the step has never been recorded" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    withFixture((_, updater) => updater.getRetryCount(runId.toString, "never-seen").map(_ shouldBe 0))
+    withFixture((_, updater, _) => updater.getRetryCount("99999", "never-seen").map(_ shouldBe 0))
   }
 
   it should "return the current value after increments" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val step  = "votes-pipeline"
-    withFixture { (_, updater) =>
+    withFixture { (_, updater, runId) =>
+      val step = "votes-pipeline"
       for {
         _       <- updater.recordStepStarted(runId.toString, step)
         _       <- updater.incrementRetryCount(runId.toString, step)
@@ -151,10 +148,9 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "multiple steps on the same run" should "be tracked independently" taggedAs DockerRequired in {
-    val runId = UUID.randomUUID()
-    val stepA = "step-a"
-    val stepB = "step-b"
-    withFixture { (xa, updater) =>
+    withFixture { (xa, updater, runId) =>
+      val stepA = "step-a"
+      val stepB = "step-b"
       for {
         _       <- updater.recordStepStarted(runId.toString, stepA)
         _       <- updater.recordStepStarted(runId.toString, stepB)
@@ -169,10 +165,10 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     }
   }
 
-  "WorkflowStateUpdater" should "raise RunIdMissing when the run ID is not a valid UUID" taggedAs DockerRequired in {
-    withFixture { (_, updater) =>
+  "WorkflowStateUpdater" should "raise RunIdMissing when the run ID is not a valid Long" taggedAs DockerRequired in {
+    withFixture { (_, updater, _) =>
       updater
-        .recordStepStarted("not-a-uuid", "step")
+        .recordStepStarted("not-a-number", "step")
         .attempt
         .map { result =>
           val _ = result.isLeft shouldBe true
@@ -181,29 +177,29 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     }
   }
 
-  it should "raise RunIdMissing on incrementRetryCount with invalid UUID" taggedAs DockerRequired in {
-    withFixture { (_, updater) =>
-      updater.incrementRetryCount("not-a-uuid", "step").attempt.map { result =>
+  it should "raise RunIdMissing on incrementRetryCount with invalid ID" taggedAs DockerRequired in {
+    withFixture { (_, updater, _) =>
+      updater.incrementRetryCount("not-a-number", "step").attempt.map { result =>
         val _ = result.isLeft shouldBe true
         result.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
       }
     }
   }
 
-  it should "raise RunIdMissing on getRetryCount with invalid UUID" taggedAs DockerRequired in {
-    withFixture { (_, updater) =>
+  it should "raise RunIdMissing on getRetryCount with invalid ID" taggedAs DockerRequired in {
+    withFixture { (_, updater, _) =>
       updater.getRetryCount("bad", "step").attempt.map(result => result.isLeft shouldBe true)
     }
   }
 
-  it should "raise RunIdMissing on recordStepCompleted with invalid UUID" taggedAs DockerRequired in {
-    withFixture { (_, updater) =>
+  it should "raise RunIdMissing on recordStepCompleted with invalid ID" taggedAs DockerRequired in {
+    withFixture { (_, updater, _) =>
       updater.recordStepCompleted("bad", "step").attempt.map(result => result.isLeft shouldBe true)
     }
   }
 
-  it should "raise RunIdMissing on recordStepFailed with invalid UUID" taggedAs DockerRequired in {
-    withFixture { (_, updater) =>
+  it should "raise RunIdMissing on recordStepFailed with invalid ID" taggedAs DockerRequired in {
+    withFixture { (_, updater, _) =>
       updater.recordStepFailed("bad", "step", "error").attempt.map(result => result.isLeft shouldBe true)
     }
   }

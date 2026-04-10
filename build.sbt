@@ -33,6 +33,7 @@ lazy val commonSettings = Seq(
   resolvers ++= Seq(
     "GitHub Packages - shared-models" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-shared-models",
     "GitHub Packages - pipeline-models" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-pipeline-models",
+    "GitHub Packages - db-migrations" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-db-migrations",
   ),
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.2.18" % Test
@@ -86,8 +87,9 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
       ++ diff
     ,
     libraryDependencies += "com.h2database" % "h2" % "2.2.224" % Test,
-    libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.2",
-    libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.3",
+    libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.8",
+    libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.9",
+    libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.8" % Test,
     // Circe semi-auto derivation for large case classes
     scalacOptions += "-Xmax-inlines:64",
     // Exclude DB-backed integration tests from `sbt test` by default — they require a local
