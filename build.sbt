@@ -92,6 +92,10 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
     libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.9" % Test,
     // Circe semi-auto derivation for large case classes
     scalacOptions += "-Xmax-inlines:64",
+    // DB-backed suites share a single AlloyDB Omni container and TRUNCATE shared tables in
+    // beforeEach/withRepo. Parallel execution causes cross-suite TRUNCATE races where one
+    // suite wipes another's just-inserted rows.
+    Test / parallelExecution := false,
     // Exclude DB-backed integration tests from `sbt test` by default — they require a local
     // Docker daemon to start an AlloyDB Omni container. Use the `dockerTest` alias below to
     // run them explicitly.
