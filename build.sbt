@@ -77,7 +77,7 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
   .settings(
     commonSettings,
     name := "repcheck-ingestion-common",
-    exceptionUniquenessRootPackages := Seq("repcheck.ingestion"),
+    exceptionUniquenessRootPackages := Seq("com.repcheck", "repcheck"),
     libraryDependencies ++= http4sEmber ++ circe ++ pureConfig ++ fs2
       ++ catsEffect ++ testDeps
       ++ doobie
