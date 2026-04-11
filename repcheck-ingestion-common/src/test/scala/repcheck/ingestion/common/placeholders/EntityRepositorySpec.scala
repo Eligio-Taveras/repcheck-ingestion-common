@@ -15,6 +15,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.db.TransactorResource
 import repcheck.ingestion.common.testing.{DockerPostgresSpec, DockerRequired}
+import repcheck.shared.models.congress.common.DoobieEnumInstances._
+import repcheck.shared.models.congress.common.{Party, UsState}
 import repcheck.shared.models.congress.dos.member.MemberDO
 import repcheck.shared.models.placeholder.HasPlaceholder
 
@@ -32,9 +34,9 @@ class EntityRepositorySpec extends AnyFlatSpec with Matchers with DockerPostgres
       Option[String],
       Option[String],
       Option[String],
-      Option[String],
-      Option[String],
-      Option[String],
+      Option[Int],
+      Option[Party],
+      Option[UsState],
       Option[Int],
       Option[String],
       Option[String],
@@ -56,7 +58,7 @@ class EntityRepositorySpec extends AnyFlatSpec with Matchers with DockerPostgres
         m.imageUrl,
         m.imageAttribution,
         m.officialUrl,
-        m.updateDate.map(Instant.parse),
+        m.updateDate,
       )
     }
   }

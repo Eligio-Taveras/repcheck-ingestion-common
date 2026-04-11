@@ -14,6 +14,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.db.TransactorResource
 import repcheck.ingestion.common.testing.{DockerPostgresSpec, DockerRequired}
+import repcheck.shared.models.congress.common.DoobieEnumInstances._
+import repcheck.shared.models.congress.common.{Party, UsState}
 import repcheck.shared.models.congress.dos.member.MemberDO
 
 class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers with DockerPostgresSpec {
@@ -32,9 +34,9 @@ class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers with DockerPostgr
       Option[String],
       Option[String],
       Option[String],
-      Option[String],
-      Option[String],
-      Option[String],
+      Option[Int],
+      Option[Party],
+      Option[UsState],
       Option[Int],
       Option[String],
       Option[String],
@@ -56,7 +58,7 @@ class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers with DockerPostgr
         m.imageUrl,
         m.imageAttribution,
         m.officialUrl,
-        m.updateDate.map(Instant.parse),
+        m.updateDate,
       )
     }
   }
@@ -89,7 +91,7 @@ class PlaceholderCreatorSpec extends AnyFlatSpec with Matchers with DockerPostgr
   private def loadByKey(xa: Transactor[IO], key: String): IO[Option[MemberDO]] =
     sql"""SELECT id, natural_key, first_name, last_name, direct_order_name, inverted_order_name,
                  honorific_name, birth_year, current_party, state, district, image_url, image_attribution,
-                 official_url, update_date::TEXT, created_at, updated_at
+                 official_url, update_date, created_at, updated_at
           FROM members WHERE natural_key = $key"""
       .query[MemberDO]
       .option
