@@ -7,7 +7,7 @@ import org.http4s.ember.client.EmberClientBuilder
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -19,7 +19,11 @@ import repcheck.pipeline.models.errors.RetryConfig
 
 class XmlFeedClientSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
-  private val wireMock                    = new WireMockServer(wireMockConfig().dynamicPort())
+  private val wireMock = new WireMockServer(
+    WireMockConfiguration.options()
+      .bindAddress("127.0.0.1")
+      .dynamicPort()
+  )
   implicit private val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   override def beforeAll(): Unit = {
