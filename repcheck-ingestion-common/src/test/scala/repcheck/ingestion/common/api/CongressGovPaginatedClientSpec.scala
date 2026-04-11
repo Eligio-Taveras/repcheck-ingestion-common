@@ -21,7 +21,8 @@ import org.scalatest.matchers.should.Matchers
 class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with BeforeAndAfterAll {
 
   private val wireMock = new WireMockServer(
-    WireMockConfiguration.options()
+    WireMockConfiguration
+      .options()
       .bindAddress("127.0.0.1")
       .dynamicPort()
   )

@@ -20,10 +20,12 @@ import repcheck.pipeline.models.errors.RetryConfig
 class XmlFeedClientSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
   private val wireMock = new WireMockServer(
-    WireMockConfiguration.options()
+    WireMockConfiguration
+      .options()
       .bindAddress("127.0.0.1")
       .dynamicPort()
   )
+
   implicit private val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   override def beforeAll(): Unit = {
