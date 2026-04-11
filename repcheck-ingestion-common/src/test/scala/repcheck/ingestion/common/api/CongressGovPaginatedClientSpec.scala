@@ -13,14 +13,19 @@ import org.http4s.{Request, Uri}
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with BeforeAndAfterAll {
 
-  private val wireMock = new WireMockServer(wireMockConfig().dynamicPort())
+  private val wireMock = new WireMockServer(
+    WireMockConfiguration
+      .options()
+      .bindAddress("127.0.0.1")
+      .dynamicPort()
+  )
 
   override def beforeAll(): Unit = {
     super.beforeAll()
