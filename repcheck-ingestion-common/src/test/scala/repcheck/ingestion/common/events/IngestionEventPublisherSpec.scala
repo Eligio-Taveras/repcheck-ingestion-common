@@ -35,7 +35,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       (capturingPub, eventPub) <- createCapturingPublisher
       correlationId = UUID.randomUUID()
       event = BillTextAvailableEvent(
-        billId = "hr1-118",
+        naturalKey = "hr1-118",
         congress = 118,
         textUrl = "https://example.com/hr1.xml",
         textFormat = "xml",
@@ -50,7 +50,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       val (pubTopic, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
       val _                       = pubTopic shouldBe topicName
       val _                       = json should include("\"eventType\":\"bill.text.available\"")
-      val _                       = json should include("\"billId\":\"hr1-118\"")
+      val _                       = json should include("\"naturalKey\":\"hr1-118\"")
       attrs shouldBe Map("eventType" -> "bill.text.available")
     }
     test.unsafeRunSync()
@@ -62,7 +62,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       correlationId = UUID.randomUUID()
       versionId     = UUID.randomUUID()
       event = BillTextIngestedEvent(
-        billId = "s200-118",
+        naturalKey = "s200-118",
         versionId = versionId,
         congress = 118,
         versionCode = "enr",
@@ -74,7 +74,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       val _                = msgId shouldBe "msg-1"
       val (_, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
       val _                = json should include("\"eventType\":\"bill.text.ingested\"")
-      val _                = json should include("\"billId\":\"s200-118\"")
+      val _                = json should include("\"naturalKey\":\"s200-118\"")
       attrs shouldBe Map("eventType" -> "bill.text.ingested")
     }
     test.unsafeRunSync()
@@ -86,7 +86,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       correlationId = UUID.randomUUID()
       event = VoteRecordedEvent(
         voteId = "h123-118.2024",
-        billId = Some("hr1-118"),
+        naturalKey = Some("hr1-118"),
         chamber = "House",
         date = Instant.parse("2024-03-15T14:30:00Z"),
         congress = 118,
