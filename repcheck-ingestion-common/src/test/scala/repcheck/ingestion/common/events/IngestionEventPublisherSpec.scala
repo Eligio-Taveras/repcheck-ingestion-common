@@ -67,7 +67,6 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
         congress = 118,
         versionCode = "enr",
         previousVersionCode = Some("eh"),
-        committeeCode = Some("HSJU"),
       )
       msgId    <- eventPub.billTextIngested(event, correlationId)
       captured <- capturingPub.captured
@@ -193,7 +192,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
         correlationId,
       )
       _ <- eventPub.billTextIngested(
-        BillTextIngestedEvent("hr1-118", UUID.randomUUID(), 118, "ih", None, None),
+        BillTextIngestedEvent("hr1-118", UUID.randomUUID(), 118, "ih", None),
         correlationId,
       )
       _ <- eventPub.voteRecorded(
