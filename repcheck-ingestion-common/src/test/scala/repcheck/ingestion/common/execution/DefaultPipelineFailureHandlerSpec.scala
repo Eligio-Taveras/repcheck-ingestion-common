@@ -14,7 +14,7 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
   private val topic   = "projects/test/topics/retries"
   private val runId   = "00000000-0000-0000-0000-000000000001"
   private val step    = "bills-pipeline"
-  private val origMsg = """{"billId":"hr1-118"}"""
+  private val origMsg = """{"naturalKey":"hr1-118"}"""
 
   private val defaultConfig = PipelineFailureHandlerConfig(maxRetries = 3)
 
