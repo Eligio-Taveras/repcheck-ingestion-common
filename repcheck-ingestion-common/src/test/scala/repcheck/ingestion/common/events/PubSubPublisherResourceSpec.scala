@@ -5,7 +5,7 @@ import cats.effect.unsafe.implicits.global
 
 import com.google.api.core.SettableApiFuture
 import com.google.cloud.pubsub.v1.Publisher
-import com.google.pubsub.v1.PubsubMessage
+import com.google.pubsub.v1.{PubsubMessage, TopicName}
 
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{mock, verify, when}
@@ -106,6 +106,23 @@ class PubSubPublisherResourceSpec extends AnyFlatSpec with Matchers {
       case Left(ex) =>
         fail(s"Unexpected exception from factory: ${ex.getMessage}")
     }
+  }
+
+  "configureEmulator" should "set NoCredentialsProvider when emulator host is provided" in {
+    val builder    = Publisher.newBuilder(TopicName.of("test-project", "test-topic"))
+    val configured = PubSubPublisherResource.configureEmulator(builder, Some("localhost:8085"))
+    val publisher  = configured.build()
+    try publisher.toString should not be empty
+    finally {
+      publisher.shutdown()
+      val _ = publisher.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)
+    }
+  }
+
+  it should "leave builder unchanged when emulator host is None" in {
+    val builder    = Publisher.newBuilder(TopicName.of("test-project", "test-topic"))
+    val configured = PubSubPublisherResource.configureEmulator(builder, None)
+    configured shouldBe builder
   }
 
   "make(config)" should "create resource using defaultPublisherFactory" in {

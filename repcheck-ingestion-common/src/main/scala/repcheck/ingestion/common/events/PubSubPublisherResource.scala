@@ -14,21 +14,26 @@ import io.grpc.ManagedChannelBuilder
 
 object PubSubPublisherResource {
 
+  /** Configure the Publisher builder for the Pub/Sub emulator when PUBSUB_EMULATOR_HOST is set. */
+  private[events] def configureEmulator(
+    builder: Publisher.Builder,
+    emulatorHost: Option[String],
+  ): Publisher.Builder = {
+    emulatorHost.foreach { host =>
+      val channel         = ManagedChannelBuilder.forTarget(host).usePlaintext().build()
+      val channelProvider = FixedTransportChannelProvider.create(GrpcTransportChannel.create(channel))
+      builder.setChannelProvider(channelProvider)
+      builder.setCredentialsProvider(NoCredentialsProvider.create())
+    }
+    builder
+  }
+
   private[events] def defaultPublisherFactory[F[_]: Sync](
     config: EventPublisherConfig
   ): F[Publisher] =
     Sync[F].blocking {
       val topicName = TopicName.of(config.projectId, config.topicName)
-      val builder   = Publisher.newBuilder(topicName)
-
-      // When the Pub/Sub emulator is configured, use no-auth and connect directly
-      sys.env.get("PUBSUB_EMULATOR_HOST").foreach { emulatorHost =>
-        val channel         = ManagedChannelBuilder.forTarget(emulatorHost).usePlaintext().build()
-        val channelProvider = FixedTransportChannelProvider.create(GrpcTransportChannel.create(channel))
-        builder.setChannelProvider(channelProvider)
-        builder.setCredentialsProvider(NoCredentialsProvider.create())
-      }
-
+      val builder   = configureEmulator(Publisher.newBuilder(topicName), sys.env.get("PUBSUB_EMULATOR_HOST"))
       builder.build()
     }
 
