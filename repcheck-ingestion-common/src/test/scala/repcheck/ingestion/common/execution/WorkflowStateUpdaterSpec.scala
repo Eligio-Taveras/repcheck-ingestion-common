@@ -70,7 +70,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
       for {
         _      <- updater.recordStepStarted(runId.toString, step)
         status <- readStatus(xa, runId, step)
-      } yield status shouldBe Some("Running")
+      } yield status shouldBe Some("running")
     }
   }
 
@@ -94,7 +94,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
         status         <- readStatus(xa, runId, step)
         completedAtSet <- readCompletedAtPresent(xa, runId, step)
       } yield {
-        val _ = status shouldBe Some("Completed")
+        val _ = status shouldBe Some("completed")
         completedAtSet shouldBe true
       }
     }
@@ -109,7 +109,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
         status       <- readStatus(xa, runId, step)
         errorMessage <- readErrorMessage(xa, runId, step)
       } yield {
-        val _ = status shouldBe Some("Failed")
+        val _ = status shouldBe Some("failed")
         errorMessage shouldBe Some("connection timeout")
       }
     }
@@ -159,8 +159,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
         statusA <- readStatus(xa, runId, stepA)
         statusB <- readStatus(xa, runId, stepB)
       } yield {
-        val _ = statusA shouldBe Some("Completed")
-        statusB shouldBe Some("Failed")
+        val _ = statusA shouldBe Some("completed")
+        statusB shouldBe Some("failed")
       }
     }
   }
