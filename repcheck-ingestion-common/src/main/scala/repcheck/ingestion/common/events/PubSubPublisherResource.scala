@@ -4,8 +4,13 @@ import java.util.concurrent.TimeUnit
 
 import cats.effect.{Resource, Sync}
 
+import com.google.api.gax.core.NoCredentialsProvider
+import com.google.api.gax.grpc.GrpcTransportChannel
+import com.google.api.gax.rpc.FixedTransportChannelProvider
 import com.google.cloud.pubsub.v1.Publisher
 import com.google.pubsub.v1.TopicName
+
+import io.grpc.ManagedChannelBuilder
 
 object PubSubPublisherResource {
 
@@ -14,7 +19,17 @@ object PubSubPublisherResource {
   ): F[Publisher] =
     Sync[F].blocking {
       val topicName = TopicName.of(config.projectId, config.topicName)
-      Publisher.newBuilder(topicName).build()
+      val builder   = Publisher.newBuilder(topicName)
+
+      // When the Pub/Sub emulator is configured, use no-auth and connect directly
+      sys.env.get("PUBSUB_EMULATOR_HOST").foreach { emulatorHost =>
+        val channel         = ManagedChannelBuilder.forTarget(emulatorHost).usePlaintext().build()
+        val channelProvider = FixedTransportChannelProvider.create(GrpcTransportChannel.create(channel))
+        builder.setChannelProvider(channelProvider)
+        builder.setCredentialsProvider(NoCredentialsProvider.create())
+      }
+
+      builder.build()
     }
 
   def make[F[_]: Sync](
