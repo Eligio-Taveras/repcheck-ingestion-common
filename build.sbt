@@ -89,7 +89,7 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
     libraryDependencies += "com.h2database" % "h2" % "2.2.224" % Test,
     libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.16",
     libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.16",
-    libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.9" % Test,
+    libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.12" % Test,
     // Circe semi-auto derivation for large case classes
     scalacOptions += "-Xmax-inlines:64",
     // DB-backed suites share a single AlloyDB Omni container and TRUNCATE shared tables in
