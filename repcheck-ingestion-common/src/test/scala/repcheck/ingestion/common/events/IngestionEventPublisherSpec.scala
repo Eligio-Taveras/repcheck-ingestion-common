@@ -10,6 +10,7 @@ import io.circe.parser.decode
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import repcheck.pipeline.models.errors.{RetryConfig, RetryWrapper}
 import repcheck.pipeline.models.events.{
   BillTextAvailableEvent,
   BillTextIngestedEvent,
@@ -20,14 +21,24 @@ import repcheck.pipeline.models.events.{
 
 class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
 
-  private val topicName = "projects/test/topics/ingestion-events"
-  private val source    = "test-pipeline"
+  private val topicName     = "projects/test/topics/ingestion-events"
+  private val source        = "test-pipeline"
+  private val noRetryConfig = RetryConfig(maxRetries = 0)
+
+  private val noOpRetryWrapper: RetryWrapper[IO] =
+    new RetryWrapper[IO]((_, _, _, _, _, _) => IO.unit)
 
   private def createCapturingPublisher: IO[(CapturingPublisher[IO], DefaultIngestionEventPublisher[IO])] =
     for {
       ref <- Ref.of[IO, List[(String, String, Map[String, String])]](List.empty)
       capturingPub = new CapturingPublisher[IO](ref)
-      eventPub     = new DefaultIngestionEventPublisher[IO](capturingPub, topicName, source)
+      eventPub = new DefaultIngestionEventPublisher[IO](
+        capturingPub,
+        topicName,
+        source,
+        noOpRetryWrapper,
+        noRetryConfig,
+      )
     } yield (capturingPub, eventPub)
 
   "billTextAvailable" should "publish with eventType bill.text.available" in {
@@ -125,10 +136,22 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
     val test = for {
       ref1 <- Ref.of[IO, List[(String, String, Map[String, String])]](List.empty)
       ref2 <- Ref.of[IO, List[(String, String, Map[String, String])]](List.empty)
-      pub1          = new CapturingPublisher[IO](ref1)
-      pub2          = new CapturingPublisher[IO](ref2)
-      eventPub1     = new DefaultIngestionEventPublisher[IO](pub1, topicName, "bills-pipeline")
-      eventPub2     = new DefaultIngestionEventPublisher[IO](pub2, topicName, "votes-pipeline")
+      pub1 = new CapturingPublisher[IO](ref1)
+      pub2 = new CapturingPublisher[IO](ref2)
+      eventPub1 = new DefaultIngestionEventPublisher[IO](
+        pub1,
+        topicName,
+        "bills-pipeline",
+        noOpRetryWrapper,
+        noRetryConfig,
+      )
+      eventPub2 = new DefaultIngestionEventPublisher[IO](
+        pub2,
+        topicName,
+        "votes-pipeline",
+        noOpRetryWrapper,
+        noRetryConfig,
+      )
       correlationId = UUID.randomUUID()
       event         = MemberUpdatedEvent(memberId = "B000001")
       _         <- eventPub1.memberUpdated(event, correlationId)
@@ -167,24 +190,33 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
     test.unsafeRunSync()
   }
 
-  "publisher failure" should "propagate to caller" in {
+  "publisher failure" should "propagate to caller as EventPublishFailed" in {
     val failingPublisher = new PubSubEventPublisher[IO] {
       override def publish(topic: String, data: String, attributes: Map[String, String]): IO[String] =
         IO.raiseError(new RuntimeException("Pub/Sub unavailable"))
     }
-    val eventPub = new DefaultIngestionEventPublisher[IO](failingPublisher, topicName, source)
-    val event    = MemberUpdatedEvent(memberId = "D000001")
+    val eventPub =
+      new DefaultIngestionEventPublisher[IO](failingPublisher, topicName, source, noOpRetryWrapper, noRetryConfig)
+    val event = MemberUpdatedEvent(memberId = "D000001")
 
     val result = eventPub.memberUpdated(event, UUID.randomUUID()).attempt.unsafeRunSync()
     val _      = result.isLeft shouldBe true
-    result.swap.getOrElse(fail("Expected error")).getMessage shouldBe "Pub/Sub unavailable"
+    val error  = result.swap.getOrElse(fail("Expected error"))
+    val _      = error shouldBe a[EventPublishFailed]
+    error.getMessage should include("Pub/Sub unavailable")
   }
 
   "attributes" should "include eventType for each method" in {
     val test = for {
       ref <- Ref.of[IO, List[(String, String, Map[String, String])]](List.empty)
-      capturingPub  = new CapturingPublisher[IO](ref)
-      eventPub      = new DefaultIngestionEventPublisher[IO](capturingPub, topicName, source)
+      capturingPub = new CapturingPublisher[IO](ref)
+      eventPub = new DefaultIngestionEventPublisher[IO](
+        capturingPub,
+        topicName,
+        source,
+        noOpRetryWrapper,
+        noRetryConfig,
+      )
       correlationId = UUID.randomUUID()
 
       _ <- eventPub.billTextAvailable(
@@ -211,6 +243,64 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
     }
     test.unsafeRunSync()
   }
+
+  "retry" should "succeed after transient publish failure" in {
+    val retryConfig  = RetryConfig(maxRetries = 3, initialBackoffMs = 1L, maxBackoffMs = 1L)
+    val retryWrapper = new RetryWrapper[IO]((_, _, _, _, _, _) => IO.unit)
+
+    val test = for {
+      callCount <- Ref.of[IO, Int](0)
+      failThenSucceedPub = new FailThenSucceedPublisher(callCount, failUntil = 1)
+      eventPub = new DefaultIngestionEventPublisher[IO](
+        failThenSucceedPub,
+        topicName,
+        source,
+        retryWrapper,
+        retryConfig,
+      )
+      correlationId = UUID.randomUUID()
+      event         = MemberUpdatedEvent(memberId = "R000001")
+      msgId <- eventPub.memberUpdated(event, correlationId)
+      count <- callCount.get
+    } yield {
+      val _ = msgId shouldBe "msg-2"
+      count shouldBe 2
+    }
+    test.unsafeRunSync()
+  }
+
+  it should "propagate error after all retries exhausted" in {
+    val retryConfig  = RetryConfig(maxRetries = 2, initialBackoffMs = 1L, maxBackoffMs = 1L)
+    val retryWrapper = new RetryWrapper[IO]((_, _, _, _, _, _) => IO.unit)
+
+    val alwaysFailPublisher = new PubSubEventPublisher[IO] {
+      override def publish(topic: String, data: String, attributes: Map[String, String]): IO[String] =
+        IO.raiseError(EventPublishFailed(topic, "always fails"))
+    }
+    val eventPub =
+      new DefaultIngestionEventPublisher[IO](alwaysFailPublisher, topicName, source, retryWrapper, retryConfig)
+    val event = MemberUpdatedEvent(memberId = "R000002")
+
+    val result = eventPub.memberUpdated(event, UUID.randomUUID()).attempt.unsafeRunSync()
+    val _      = result.isLeft shouldBe true
+    val error  = result.swap.getOrElse(fail("Expected error"))
+    val _      = error shouldBe a[EventPublishFailed]
+    error.getMessage should include(topicName)
+  }
+
+}
+
+class FailThenSucceedPublisher(ref: Ref[IO, Int], failUntil: Int) extends PubSubEventPublisher[IO] {
+
+  override def publish(topic: String, data: String, attributes: Map[String, String]): IO[String] =
+    ref.modify { count =>
+      val next = count + 1
+      if (next <= failUntil) {
+        (next, IO.raiseError[String](EventPublishFailed(topic, s"attempt $next")))
+      } else {
+        (next, IO.pure(s"msg-$next"))
+      }
+    }.flatten
 
 }
 
