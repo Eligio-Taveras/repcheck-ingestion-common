@@ -18,7 +18,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
 
   /** Insert a parent workflow_runs row and return its auto-generated id. */
   private def createWorkflowRun(xa: Transactor[IO], name: String): IO[Long] =
-    sql"""INSERT INTO workflow_runs (workflow_name, status, trigger) VALUES ($name, 'running', 'manual')""".update
+    sql"""INSERT INTO workflow_runs (workflow_name, status, triggered_by) VALUES ($name, 'running', 'manual')""".update
       .withUniqueGeneratedKeys[Long]("id")
       .transact(xa)
 
