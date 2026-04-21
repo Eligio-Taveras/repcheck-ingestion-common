@@ -1,24 +1,18 @@
 package repcheck.ingestion.common.api
 
-import repcheck.pipeline.models.errors.{ErrorClass, ErrorClassifier}
+import repcheck.ingestion.common.errors.HttpStatusErrorClassifier
 
-object CongressGovErrorClassifier extends ErrorClassifier {
+/**
+ * Classifier for [[CongressGovApiException]] HTTP failures. Treats the standard Congress.gov transient status codes
+ * (429, 500, 502, 503, 504) as `ErrorClass.Transient` so the retry wrapper retries them; everything else maps to
+ * `ErrorClass.Systemic` to fail fast.
+ *
+ * Concrete wiring of the shared [[HttpStatusErrorClassifier]] base: supplies the transient set and the
+ * `CongressGovApiException` status extractor.
+ */
+object CongressGovErrorClassifier extends HttpStatusErrorClassifier(Set(429, 500, 502, 503, 504)) {
 
-  private val transientStatusCodes: Set[Int] = Set(429, 500, 502, 503, 504)
-
-  def classify(error: Throwable): ErrorClass =
-    extractStatusCode(error) match {
-      case Some(code) =>
-        if (transientStatusCodes.contains(code)) {
-          ErrorClass.Transient
-        } else {
-          ErrorClass.Systemic
-        }
-      case None =>
-        ErrorClass.Systemic
-    }
-
-  private def extractStatusCode(error: Throwable): Option[Int] =
+  override protected def extractStatusCode(error: Throwable): Option[Int] =
     error match {
       case e: CongressGovApiException => Some(e.statusCode)
       case _                          => None
