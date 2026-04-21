@@ -6,18 +6,14 @@ import repcheck.pipeline.models.errors.ErrorClass
 
 class HttpStatusErrorClassifierSpec extends AnyFlatSpec with Matchers {
 
-  // Fixture Throwable carrying a status code, for exercising the base class in isolation. Confined to the spec to
-  // avoid polluting production's Throwable-subclass uniqueness scan.
-  final case class FakeHttpStatusError(statusCode: Int) extends RuntimeException(s"Fake HTTP $statusCode")
+  // Fixture Throwable carrying a status code via the HttpStatusError trait, for exercising the base class in
+  // isolation. Confined to the spec to avoid polluting production's Throwable-subclass uniqueness scan.
+  final case class FakeHttpStatusError(statusCode: Int)
+      extends RuntimeException(s"Fake HTTP $statusCode")
+      with HttpStatusError
 
-  private def makeClassifier(transient: Set[Int]): HttpStatusErrorClassifier =
-    new HttpStatusErrorClassifier(transient) {
-      override protected def extractStatusCode(error: Throwable): Option[Int] =
-        error match {
-          case e: FakeHttpStatusError => Some(e.statusCode)
-          case _                      => None
-        }
-    }
+  private def makeClassifier(transient: Set[Int]): HttpStatusErrorClassifier[FakeHttpStatusError] =
+    new HttpStatusErrorClassifier[FakeHttpStatusError](transient) {}
 
   "HttpStatusErrorClassifier" should "classify a status code listed as transient as Transient" in {
     val classifier = makeClassifier(Set(429, 500))
@@ -29,7 +25,7 @@ class HttpStatusErrorClassifierSpec extends AnyFlatSpec with Matchers {
     classifier.classify(FakeHttpStatusError(401)) shouldBe ErrorClass.Systemic
   }
 
-  it should "classify a Throwable without a status code as Systemic" in {
+  it should "classify a Throwable that does not implement HttpStatusError as Systemic" in {
     val classifier = makeClassifier(Set(429, 500))
     classifier.classify(new RuntimeException("No status")) shouldBe ErrorClass.Systemic
   }
