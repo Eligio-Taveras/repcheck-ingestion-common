@@ -113,23 +113,27 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
     implicit val decoder: Decoder[TestItem] = Decoder.forProduct2("id", "name")(TestItem.apply)
   }
 
-  private def stubPage(offset: Int, pageSize: Int, items: List[TestItem], totalCount: Int): Unit = {
+  /** Build the JSON response body for a page response. Extracted so stateful (scenario-based) stubs can reuse it. */
+  private def stubBody(items: List[TestItem], totalCount: Int, pageSize: Int, offset: Int): String = {
     val itemsJson = items
       .map(item => s"""{"id": ${item.id}, "name": "${item.name}"}""")
       .mkString("[", ",", "]")
 
-    val responseBody =
-      s"""{
-         |  "items": $itemsJson,
-         |  "pagination": {
-         |    "count": $totalCount,
-         |    "next": ${
-          if (items.size >= pageSize)
-            s""""http://localhost:${wireMock.port()}/test-endpoint?offset=${offset + pageSize}""""
-          else "null"
-        }
-         |  }
-         |}""".stripMargin
+    s"""{
+       |  "items": $itemsJson,
+       |  "pagination": {
+       |    "count": $totalCount,
+       |    "next": ${
+        if (items.size >= pageSize)
+          s""""http://localhost:${wireMock.port()}/test-endpoint?offset=${offset + pageSize}""""
+        else "null"
+      }
+       |  }
+       |}""".stripMargin
+  }
+
+  private def stubPage(offset: Int, pageSize: Int, items: List[TestItem], totalCount: Int): Unit = {
+    val responseBody = stubBody(items, totalCount, pageSize, offset)
 
     val _ = wireMock.stubFor(
       get(urlPathEqualTo("/test-endpoint"))
@@ -207,6 +211,135 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
     timed.asserting { elapsed =>
       // With 2 pages, there should be at least 1 delay of 150ms
       elapsed.toMillis should be >= 100L
+    }
+  }
+
+  it should "retry an anomalously short page mid-stream and recover the full page" in {
+    wireMock.resetAll()
+
+    val pageSize       = 250
+    val firstShortBody = stubBody(makeItems(251, 100), totalCount = 600, pageSize = pageSize, offset = 250)
+    val recoveredBody  = stubBody(makeItems(251, 250), totalCount = 600, pageSize = pageSize, offset = 250)
+
+    stubPage(0, pageSize, makeItems(1, 250), 600)
+    stubPage(500, pageSize, makeItems(501, 100), 600) // legitimate last page (100 items + offset 750 >= 600)
+
+    // Stateful stub for offset=250: first call returns 100 items (anomalous short),
+    // second call returns 250 items (recovered).
+    val _ = wireMock.stubFor(
+      get(urlPathEqualTo("/test-endpoint"))
+        .withQueryParam("offset", equalTo("250"))
+        .inScenario("offset-250-recovers-on-retry")
+        .whenScenarioStateIs(com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED)
+        .willSetStateTo("after-first-call")
+        .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(firstShortBody))
+    )
+    val _ = wireMock.stubFor(
+      get(urlPathEqualTo("/test-endpoint"))
+        .withQueryParam("offset", equalTo("250"))
+        .inScenario("offset-250-recovers-on-retry")
+        .whenScenarioStateIs("after-first-call")
+        .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(recoveredBody))
+    )
+
+    val client = makeClient("test-key")
+    val params = FetchParams(pageSize = pageSize)
+
+    client.fetchAll(params).compile.toList.asserting { items =>
+      val _ = items.size shouldBe 600
+      // offset=250 should have been requested at least twice — once for the short page, once for the retry
+      val requestsAtOffset250 = wireMock
+        .findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")).withQueryParam("offset", equalTo("250")))
+        .size()
+      val _ = requestsAtOffset250 should be >= 2
+      items.map(_.id) shouldBe (1 to 600).toList
+    }
+  }
+
+  it should "give up after MaxShortPageRetries and accept a persistently short page, then continue paginating" in {
+    wireMock.resetAll()
+
+    val pageSize = 250
+    stubPage(0, pageSize, makeItems(1, 250), 600)
+    // offset=250 always returns 100 items (anomalous short) — totalCount says 600 so we expect more,
+    // but the API never recovers. Pipeline must accept after retries exhaust and continue.
+    stubPage(250, pageSize, makeItems(251, 100), 600)
+    // offset=500 returns 0 items — terminates the stream after retry-exhaustion at offset=250.
+    val _ = wireMock.stubFor(
+      get(urlPathEqualTo("/test-endpoint"))
+        .withQueryParam("offset", equalTo("500"))
+        .willReturn(
+          aResponse()
+            .withStatus(200)
+            .withHeader("Content-Type", "application/json")
+            .withBody("""{"items": [], "pagination": {"count": 600}}""")
+        )
+    )
+
+    val client = makeClient("test-key")
+    val params = FetchParams(pageSize = pageSize)
+
+    client.fetchAll(params).compile.toList.asserting { items =>
+      val _ = items.size shouldBe 350 // 250 (full first page) + 100 (accepted short page after retries)
+      // offset=250 should have been requested 11 times: initial + 10 retries
+      val requestsAtOffset250 = wireMock
+        .findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")).withQueryParam("offset", equalTo("250")))
+        .size()
+      val _ = requestsAtOffset250 shouldBe 11
+      items.map(_.id) shouldBe ((1 to 250) ++ (251 to 350)).toList
+    }
+  }
+
+  it should "treat empty page as immediate end-of-stream (no retry)" in {
+    wireMock.resetAll()
+
+    val pageSize = 250
+    stubPage(0, pageSize, makeItems(1, 250), 600)
+    // offset=250 returns empty even though totalCount=600 says more should exist.
+    // Empty (zero items) is treated as defensive end-of-stream — NOT retried.
+    val _ = wireMock.stubFor(
+      get(urlPathEqualTo("/test-endpoint"))
+        .withQueryParam("offset", equalTo("250"))
+        .willReturn(
+          aResponse()
+            .withStatus(200)
+            .withHeader("Content-Type", "application/json")
+            .withBody("""{"items": [], "pagination": {"count": 600}}""")
+        )
+    )
+
+    val client = makeClient("test-key")
+    val params = FetchParams(pageSize = pageSize)
+
+    client.fetchAll(params).compile.toList.asserting { items =>
+      val _ = items.size shouldBe 250
+      // offset=250 should have been requested exactly once — no retries
+      val requestsAtOffset250 = wireMock
+        .findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")).withQueryParam("offset", equalTo("250")))
+        .size()
+      requestsAtOffset250 shouldBe 1
+    }
+  }
+
+  it should "terminate based on totalCount even when last page is short (no spurious retry)" in {
+    wireMock.resetAll()
+
+    val pageSize = 250
+    // Page 1: 250 items, totalCount=300. offset=0+250=250 < 300, full page, continue.
+    stubPage(0, pageSize, makeItems(1, 250), 300)
+    // Page 2: 50 items (short), totalCount=300. offset=250+250=500 >= 300, isLastByCount=true → no retry.
+    stubPage(250, pageSize, makeItems(251, 50), 300)
+
+    val client = makeClient("test-key")
+    val params = FetchParams(pageSize = pageSize)
+
+    client.fetchAll(params).compile.toList.asserting { items =>
+      val _ = items.size shouldBe 300
+      // offset=250 should have been requested exactly ONCE (no retry, because totalCount says we're done)
+      val requestsAtOffset250 = wireMock
+        .findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")).withQueryParam("offset", equalTo("250")))
+        .size()
+      requestsAtOffset250 shouldBe 1
     }
   }
 
