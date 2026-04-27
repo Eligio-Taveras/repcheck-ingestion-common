@@ -40,26 +40,31 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
   private def makeClient(
     apiKey: String,
     delay: FiniteDuration = Duration.Zero,
-    shortPageRetriesOverride: Int = 10,
+    shortPageRetriesOverride: Option[Int] = None,
   ): TestPaginatedClient =
     new TestPaginatedClient(
       baseUrl = s"http://localhost:${wireMock.port()}",
       apiKey = apiKey,
       delayBetweenPages = delay,
-      shortPageRetriesValue = shortPageRetriesOverride,
+      shortPageRetriesOverride = shortPageRetriesOverride,
     )
 
-  /** Test implementation of the paginated client */
+  /**
+   * Test implementation of the paginated client. `shortPageRetriesOverride = None` falls back to the trait's default
+   * `maxShortPageRetries` (10) by calling `super.maxShortPageRetries`, exercising the trait-level default body.
+   * `Some(n)` overrides to `n`.
+   */
   private class TestPaginatedClient(
     baseUrl: String,
     apiKey: String,
     delayBetweenPages: FiniteDuration,
-    shortPageRetriesValue: Int,
+    shortPageRetriesOverride: Option[Int],
   ) extends CongressGovPaginatedClient[IO, TestItem] {
 
     override protected def pageDelay: FiniteDuration = delayBetweenPages
 
-    override protected def maxShortPageRetries: Int = shortPageRetriesValue
+    override protected def maxShortPageRetries: Int =
+      shortPageRetriesOverride.getOrElse(super.maxShortPageRetries)
 
     implicit override protected def temporal: Temporal[IO] = IO.asyncForIO
 
@@ -367,7 +372,7 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
         )
     )
 
-    val client = makeClient("test-key", shortPageRetriesOverride = 2)
+    val client = makeClient("test-key", shortPageRetriesOverride = Some(2))
     val params = FetchParams(pageSize = pageSize)
 
     client.fetchAll(params).compile.toList.asserting { items =>
