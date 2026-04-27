@@ -13,4 +13,5 @@ final case class CongressGovClientConfig(
   pageDelay: FiniteDuration = Duration.Zero,
   retry: RetryConfig = RetryConfig(),
   http: HttpClientConfig = HttpClientConfig(),
+  shortPageRetries: Int = 10,
 ) derives ConfigReader
