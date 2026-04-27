@@ -16,7 +16,8 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
     val _      = config.pageSize shouldBe 250
     val _      = config.pageDelay shouldBe Duration.Zero
     val _      = config.retry.maxRetries shouldBe 3
-    config.http.connectTimeout shouldBe 10.seconds
+    val _      = config.http.connectTimeout shouldBe 10.seconds
+    config.shortPageRetries shouldBe 10
   }
 
   it should "load from HOCON with all fields" in {
@@ -38,6 +39,7 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
         |  max-total-connections = 20
         |  idle-timeout = 30s
         |}
+        |short-page-retries = 5
         |""".stripMargin
 
     val config = ConfigSource.string(hocon).loadOrThrow[CongressGovClientConfig]
@@ -53,7 +55,8 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
     val _ = config.http.connectTimeout shouldBe 5.seconds
     val _ = config.http.requestTimeout shouldBe 15.seconds
     val _ = config.http.maxTotalConnections shouldBe 20
-    config.http.idleTimeout shouldBe 30.seconds
+    val _ = config.http.idleTimeout shouldBe 30.seconds
+    config.shortPageRetries shouldBe 5
   }
 
   it should "apply defaults when optional fields use defaults" in {
@@ -75,6 +78,7 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
         |  max-total-connections = 10
         |  idle-timeout = 60s
         |}
+        |short-page-retries = 10
         |""".stripMargin
 
     val config = ConfigSource.string(hocon).loadOrThrow[CongressGovClientConfig]
@@ -87,7 +91,8 @@ class CongressGovClientConfigSpec extends AnyFlatSpec with Matchers {
     val _ = config.http.connectTimeout shouldBe 10.seconds
     val _ = config.http.requestTimeout shouldBe 30.seconds
     val _ = config.http.maxTotalConnections shouldBe 10
-    config.http.idleTimeout shouldBe 60.seconds
+    val _ = config.http.idleTimeout shouldBe 60.seconds
+    config.shortPageRetries shouldBe 10
   }
 
 }

@@ -10,6 +10,16 @@ trait CongressGovPaginatedClient[F[_], T] {
 
   protected def pageDelay: FiniteDuration
 
+  /**
+   * Maximum number of retries per anomalous short-page mid-stream before accepting the response and continuing.
+   * Subclasses override to surface this knob through their own config (e.g.
+   * `CongressGovClientConfig.shortPageRetries`). The default of 10 matches the historical hardcoded value and gives the
+   * API ~40 × `pageDelay` of total recovery window — long enough to ride out a transient rate-limit recovery or a
+   * server-side timeout returning a partial response, short enough not to stall the run for hours when the API
+   * genuinely returned a final short page.
+   */
+  protected def maxShortPageRetries: Int = 10
+
   implicit protected def temporal: Temporal[F]
 
   def fetchPage(params: FetchParams): F[PagedResponse[T]]
@@ -21,7 +31,7 @@ trait CongressGovPaginatedClient[F[_], T] {
    *
    *   1. Empty page (`items.isEmpty`) → terminate, end-of-stream (defensive fallback) 2. Reached totalCount (`offset +
    *      pageSize >= totalCount`) → terminate, end-of-stream (authoritative) 3. Anomalous short page mid-stream → retry
-   *      up to [[MaxShortPageRetries]] times with backoff. After retries exhaust, accept and continue paginating; the
+   *      up to [[maxShortPageRetries]] times with backoff. After retries exhaust, accept and continue paginating; the
    *      next page is either full, empty (terminates), or itself short again. 4. Non-empty page → emit items, advance
    *      offset by `pageSize`
    *
@@ -32,15 +42,14 @@ trait CongressGovPaginatedClient[F[_], T] {
    * server-side timeout returning a partial response).
    *
    * Retry semantics:
-   *   - Up to [[MaxShortPageRetries]] retries per anomalous page
-   *   - Linear backoff at `pageDelay * 4` between attempts (gives the API ~40 × pageDelay total recovery window)
+   *   - Up to [[maxShortPageRetries]] retries per anomalous page (configurable per subclass)
+   *   - Linear backoff at `pageDelay * 4` between attempts (gives the API ~40 × pageDelay total recovery window at the
+   *     default budget of 10)
    *   - Same `(offset, pageSize)` is requested on each retry — we want a full page at THIS offset, not to skip ahead,
    *     because skipping ahead would lose items at the truncated offset that the server WILL return on a clean retry
    *   - After retries exhaust, the latest response is accepted and pagination continues at the next offset; the caller
    *     will eventually see an empty page OR reach totalCount if the API is genuinely done
    */
-  private val MaxShortPageRetries: Int = 10
-
   def fetchAll(params: FetchParams): Stream[F, T] = {
     val F = temporal
 
@@ -69,7 +78,7 @@ trait CongressGovPaginatedClient[F[_], T] {
       .unfoldEval[F, Option[FetchParams], List[T]](Some(params)) {
         case None => F.pure(None)
         case Some(currentParams) =>
-          F.flatMap(attemptFetch(currentParams, MaxShortPageRetries)) { response =>
+          F.flatMap(attemptFetch(currentParams, maxShortPageRetries)) { response =>
             val items         = response.items
             val nextOffset    = currentParams.offset + currentParams.pageSize
             val isLastByCount = response.totalCount > 0 && nextOffset >= response.totalCount

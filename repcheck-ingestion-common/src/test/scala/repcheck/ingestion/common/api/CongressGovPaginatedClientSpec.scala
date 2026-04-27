@@ -40,21 +40,31 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
   private def makeClient(
     apiKey: String,
     delay: FiniteDuration = Duration.Zero,
+    shortPageRetriesOverride: Option[Int] = None,
   ): TestPaginatedClient =
     new TestPaginatedClient(
       baseUrl = s"http://localhost:${wireMock.port()}",
       apiKey = apiKey,
       delayBetweenPages = delay,
+      shortPageRetriesOverride = shortPageRetriesOverride,
     )
 
-  /** Test implementation of the paginated client */
+  /**
+   * Test implementation of the paginated client. `shortPageRetriesOverride = None` falls back to the trait's default
+   * `maxShortPageRetries` (10) by calling `super.maxShortPageRetries`, exercising the trait-level default body.
+   * `Some(n)` overrides to `n`.
+   */
   private class TestPaginatedClient(
     baseUrl: String,
     apiKey: String,
     delayBetweenPages: FiniteDuration,
+    shortPageRetriesOverride: Option[Int],
   ) extends CongressGovPaginatedClient[IO, TestItem] {
 
     override protected def pageDelay: FiniteDuration = delayBetweenPages
+
+    override protected def maxShortPageRetries: Int =
+      shortPageRetriesOverride.getOrElse(super.maxShortPageRetries)
 
     implicit override protected def temporal: Temporal[IO] = IO.asyncForIO
 
@@ -340,6 +350,37 @@ class CongressGovPaginatedClientSpec extends AsyncFlatSpec with AsyncIOSpec with
         .findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")).withQueryParam("offset", equalTo("250")))
         .size()
       requestsAtOffset250 shouldBe 1
+    }
+  }
+
+  it should "respect a subclass-overridden maxShortPageRetries (e.g. 2 retries → 3 total requests)" in {
+    wireMock.resetAll()
+
+    val pageSize = 250
+    stubPage(0, pageSize, makeItems(1, 250), 600)
+    // offset=250 always returns 100 items (anomalous short). With shortPageRetries=2 we expect
+    // exactly 3 calls at offset=250 (1 initial + 2 retries) before the pipeline accepts and moves on.
+    stubPage(250, pageSize, makeItems(251, 100), 600)
+    val _ = wireMock.stubFor(
+      get(urlPathEqualTo("/test-endpoint"))
+        .withQueryParam("offset", equalTo("500"))
+        .willReturn(
+          aResponse()
+            .withStatus(200)
+            .withHeader("Content-Type", "application/json")
+            .withBody("""{"items": [], "pagination": {"count": 600}}""")
+        )
+    )
+
+    val client = makeClient("test-key", shortPageRetriesOverride = Some(2))
+    val params = FetchParams(pageSize = pageSize)
+
+    client.fetchAll(params).compile.toList.asserting { items =>
+      val _ = items.size shouldBe 350 // 250 (full first page) + 100 (accepted short page after 2 retries)
+      val requestsAtOffset250 = wireMock
+        .findAll(getRequestedFor(urlPathEqualTo("/test-endpoint")).withQueryParam("offset", equalTo("250")))
+        .size()
+      requestsAtOffset250 shouldBe 3 // 1 initial + 2 retries
     }
   }
 
