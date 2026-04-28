@@ -88,13 +88,13 @@ class PubSubPublisherResourceSpec extends AnyFlatSpec with Matchers {
     verify(pub).shutdown()
   }
 
-  "defaultPublisherFactory" should "create a Publisher that requires shutdown" in {
+  "defaultPublisherFactory" should "create a Publisher that requires shutdown when no channel supplied" in {
     // defaultPublisherFactory creates a real SDK Publisher. In environments with GCP
     // Application Default Credentials, we verify the full lifecycle. In CI (no credentials),
     // Publisher construction fails with IOException — the factory code path is still executed
     // and covered by Scoverage even when the call throws.
     PubSubPublisherResource
-      .defaultPublisherFactory[IO](testConfig)
+      .defaultPublisherFactory[IO](testConfig, None)
       .attempt
       .unsafeRunSync() match {
       case Right(publisher) =>
@@ -108,21 +108,81 @@ class PubSubPublisherResourceSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  "configureEmulator" should "set NoCredentialsProvider when emulator host is provided" in {
-    val builder    = Publisher.newBuilder(TopicName.of("test-project", "test-topic"))
-    val configured = PubSubPublisherResource.configureEmulator(builder, Some("localhost:8085"))
-    val publisher  = configured.build()
-    try publisher.toString should not be empty
-    finally {
-      publisher.shutdown()
-      val _ = publisher.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)
-    }
+  it should "construct a working Publisher when an emulator channel is supplied" in {
+    // Acquire the channel via the same Resource that production uses, then thread it into the factory.
+    // After the test, the Resource cleanup will shut the channel down — matching the production lifecycle.
+    PubSubPublisherResource
+      .emulatorChannelResource[IO](Some("localhost:8085"))
+      .use {
+        case Some(channel) =>
+          PubSubPublisherResource
+            .defaultPublisherFactory[IO](testConfig, Some(channel))
+            .map { publisher =>
+              try publisher.toString should not be empty
+              finally {
+                publisher.shutdown()
+                val _ = publisher.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)
+              }
+            }
+        case None =>
+          IO.raiseError(new AssertionError("expected emulatorChannelResource(Some) to allocate a channel"))
+      }
+      .unsafeRunSync()
   }
 
-  it should "leave builder unchanged when emulator host is None" in {
+  "configureEmulator" should "set NoCredentialsProvider when a channel is supplied" in {
+    // Acquire the channel through the resource so cleanup is automatic — same lifecycle production uses.
+    PubSubPublisherResource
+      .emulatorChannelResource[IO](Some("localhost:8085"))
+      .use {
+        case Some(channel) =>
+          IO {
+            val builder    = Publisher.newBuilder(TopicName.of("test-project", "test-topic"))
+            val configured = PubSubPublisherResource.configureEmulator(builder, Some(channel))
+            val publisher  = configured.build()
+            try publisher.toString should not be empty
+            finally {
+              publisher.shutdown()
+              val _ = publisher.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)
+            }
+          }
+        case None => IO.raiseError(new AssertionError("expected channel"))
+      }
+      .unsafeRunSync()
+  }
+
+  it should "leave builder unchanged when channel is None" in {
     val builder    = Publisher.newBuilder(TopicName.of("test-project", "test-topic"))
     val configured = PubSubPublisherResource.configureEmulator(builder, None)
     configured shouldBe builder
+  }
+
+  "emulatorChannelResource" should "return None when emulator host is None" in {
+    val result = PubSubPublisherResource
+      .emulatorChannelResource[IO](None)
+      .use(IO.pure)
+      .unsafeRunSync()
+    result shouldBe None
+  }
+
+  it should "allocate a ManagedChannel and shut it down on release when host is provided" in {
+    // Capture the channel reference outside the resource scope so we can assert on its post-release state.
+    val channelRef = new java.util.concurrent.atomic.AtomicReference[io.grpc.ManagedChannel]()
+
+    val _ = PubSubPublisherResource
+      .emulatorChannelResource[IO](Some("localhost:8085"))
+      .use {
+        case Some(channel) =>
+          IO {
+            channelRef.set(channel)
+            channel.isShutdown shouldBe false
+          }
+        case None => IO.raiseError(new AssertionError("expected Some(channel)"))
+      }
+      .unsafeRunSync()
+
+    // After release, the channel is in a shutdown state.
+    channelRef.get().isShutdown shouldBe true
   }
 
   "make(config)" should "create resource using defaultPublisherFactory" in {
