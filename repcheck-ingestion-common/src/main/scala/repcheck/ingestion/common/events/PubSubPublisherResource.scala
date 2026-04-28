@@ -19,8 +19,8 @@ object PubSubPublisherResource {
    *
    * ==Why this exists==
    *
-   * When `PUBSUB_EMULATOR_HOST` is set (local dev / docker-compose), we route the Pub/Sub publisher through a
-   * plaintext gRPC channel via `FixedTransportChannelProvider`. Per gRPC's contract, channels supplied through
+   * When `PUBSUB_EMULATOR_HOST` is set (local dev / docker-compose), we route the Pub/Sub publisher through a plaintext
+   * gRPC channel via `FixedTransportChannelProvider`. Per gRPC's contract, channels supplied through
    * `FixedTransportChannelProvider` are NOT shut down by the consuming `Publisher` on its own `shutdown()` — the caller
    * owns the channel's lifecycle. Without explicit teardown, the channel's gRPC event-loop threads (non-daemon by
    * default) keep the JVM alive forever after the IOApp's stream completes.
@@ -28,8 +28,8 @@ object PubSubPublisherResource {
    * Surfaced empirically when bill-text-pipeline's container went silent for 7 hours after its Pub/Sub stream drained:
    * `docker top` showed the JVM still running with 0.12% CPU, no new processing. Resource cleanup had run (publisher
    * shutdown, stub closed) but the leaked channel kept the JVM pinned. The same pattern is latent in every pipeline
-   * that uses this `make(config)` overload — it just hasn't manifested in the publisher-only pipelines yet because
-   * they happen to stay alive on their own (continuously emitting). Closing this gap removes the latent failure mode.
+   * that uses this `make(config)` overload — it just hasn't manifested in the publisher-only pipelines yet because they
+   * happen to stay alive on their own (continuously emitting). Closing this gap removes the latent failure mode.
    *
    * Returns `None` when the env var is unset (production GCP), since gRPC's default `InstantiatingGrpcChannelProvider`
    * manages its own channel lifecycle correctly — only the explicit `FixedTransportChannelProvider` path leaks.
@@ -56,11 +56,11 @@ object PubSubPublisherResource {
   /**
    * Configure a `Publisher.Builder` to route through an externally-supplied gRPC channel.
    *
-   * The channel's lifecycle is the caller's responsibility — typically obtained from
-   * [[emulatorChannelResource]] so it's tied to the same `Resource` chain that builds the publisher.
+   * The channel's lifecycle is the caller's responsibility — typically obtained from [[emulatorChannelResource]] so
+   * it's tied to the same `Resource` chain that builds the publisher.
    *
-   * Pre-fix (kept here for reference) this method took the emulator host string and built the channel inline,
-   * which leaked the channel forever. Now the channel is a parameter and the lifecycle is explicit.
+   * Pre-fix (kept here for reference) this method took the emulator host string and built the channel inline, which
+   * leaked the channel forever. Now the channel is a parameter and the lifecycle is explicit.
    */
   private[events] def configureEmulator(
     builder: Publisher.Builder,
