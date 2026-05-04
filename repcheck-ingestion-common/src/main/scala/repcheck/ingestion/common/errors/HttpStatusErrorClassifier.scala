@@ -1,5 +1,7 @@
 package repcheck.ingestion.common.errors
 
+import scala.annotation.tailrec
+
 import repcheck.pipeline.models.errors.{ErrorClass, ErrorClassifier}
 
 /**
@@ -25,5 +27,52 @@ abstract class HttpStatusErrorClassifier[E <: HttpStatusError](transientStatusCo
       case e: HttpStatusError if transientStatusCodes.contains(e.statusCode) => ErrorClass.Transient
       case _                                                                 => ErrorClass.Systemic
     }
+
+}
+
+object HttpStatusErrorClassifier {
+
+  /**
+   * Wraps an existing [[HttpStatusErrorClassifier]] so that network-level transients (connection drops, socket
+   * timeouts, ember stream failures, IO errors) are reclassified as `ErrorClass.Transient` before deferring to the
+   * underlying status-code classifier.
+   *
+   * Walks the cause chain depth-bounded at 16 to defeat both pathological cycles and runaway nesting. Stops at the
+   * first [[HttpStatusError]] (boundary case): once we reach a status-bearing exception, classification belongs to the
+   * underlying classifier.
+   *
+   * Use this to consolidate the cause-chain walk that per-API classifiers would otherwise duplicate. Typical wiring:
+   * {{{
+   * val classifier: ErrorClassifier =
+   *   HttpStatusErrorClassifier.transientNetworkAware(MyApiHttpStatusErrorClassifier)
+   * }}}
+   */
+  def transientNetworkAware[E <: HttpStatusError](base: HttpStatusErrorClassifier[E]): ErrorClassifier =
+    new ErrorClassifier {
+      override def classify(error: Throwable): ErrorClass =
+        if (isTransientNetworkError(error)) ErrorClass.Transient
+        else base.classify(error)
+    }
+
+  /**
+   * Walk the cause chain looking for a network-level transient exception. Recurses up to a depth-limit so a
+   * pathological cause cycle can't infinite-loop the classifier.
+   */
+  @tailrec
+  private def isTransientNetworkError(t: Throwable, depth: Int = 0): Boolean =
+    if (t == null || depth > 16) false
+    else
+      t match {
+        // SocketTimeoutException / ConnectException both extend IOException, so the IOException
+        // case below catches them too — listing them separately would fire an "Unreachable case"
+        // compiler warning.
+        case _: java.io.IOException                   => true
+        case _: org.http4s.ember.core.EmberException  => true
+        case _: java.util.concurrent.TimeoutException => true
+        case _: HttpStatusError                       => false
+        case other if other.getCause != null && other.getCause != other =>
+          isTransientNetworkError(other.getCause, depth + 1)
+        case _ => false
+      }
 
 }
