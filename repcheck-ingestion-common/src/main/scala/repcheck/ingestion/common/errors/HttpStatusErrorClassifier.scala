@@ -2,7 +2,7 @@ package repcheck.ingestion.common.errors
 
 import scala.annotation.tailrec
 
-import repcheck.pipeline.models.errors.{ErrorClass, ErrorClassifier}
+import com.repcheck.utils.errors.{ErrorClass, ErrorClassifier}
 
 /**
  * Generic [[ErrorClassifier]] for HTTP API failures that expose a status code via the [[HttpStatusError]] trait.

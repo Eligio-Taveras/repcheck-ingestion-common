@@ -10,7 +10,6 @@ import io.circe.parser.decode
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import repcheck.pipeline.models.errors.{RetryConfig, RetryWrapper}
 import repcheck.pipeline.models.events.{
   BillTextAvailableEvent,
   BillTextIngestedEvent,
@@ -18,6 +17,8 @@ import repcheck.pipeline.models.events.{
   PipelineEvent,
   VoteRecordedEvent,
 }
+
+import com.repcheck.utils.errors.{RetryConfig, RetryWrapper}
 
 class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
 
@@ -96,8 +97,8 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       (capturingPub, eventPub) <- createCapturingPublisher
       correlationId = UUID.randomUUID()
       event = VoteRecordedEvent(
-        voteId = "h123-118.2024",
-        naturalKey = Some("hr1-118"),
+        voteNaturalKey = "h123-118.2024",
+        billNaturalKey = Some("hr1-118"),
         chamber = "House",
         date = Instant.parse("2024-03-15T14:30:00Z"),
         congress = 118,
@@ -109,7 +110,7 @@ class IngestionEventPublisherSpec extends AnyFlatSpec with Matchers {
       val _                = msgId shouldBe "msg-1"
       val (_, json, attrs) = captured.headOption.getOrElse(fail("No captured messages"))
       val _                = json should include("\"eventType\":\"vote.recorded\"")
-      val _                = json should include("\"voteId\":\"h123-118.2024\"")
+      val _                = json should include("\"voteNaturalKey\":\"h123-118.2024\"")
       attrs shouldBe Map("eventType" -> "vote.recorded")
     }
     test.unsafeRunSync()

@@ -4,7 +4,7 @@ import scala.concurrent.duration._
 
 import pureconfig.ConfigReader
 
-import repcheck.pipeline.models.errors.RetryConfig
+import com.repcheck.utils.errors.RetryConfig
 
 final case class CongressGovClientConfig(
   apiKey: String,

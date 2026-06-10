@@ -15,7 +15,8 @@ import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import repcheck.ingestion.common.errors.XmlParseFailed
-import repcheck.pipeline.models.errors.RetryConfig
+
+import com.repcheck.utils.errors.RetryConfig
 
 class XmlFeedClientSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 

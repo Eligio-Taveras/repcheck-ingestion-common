@@ -8,7 +8,6 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.syntax._
 
-import repcheck.pipeline.models.errors.{ErrorClass, ErrorClassifier, RetryConfig, RetryWrapper}
 import repcheck.pipeline.models.events.{
   BillTextAvailableEvent,
   BillTextIngestedEvent,
@@ -17,6 +16,8 @@ import repcheck.pipeline.models.events.{
   PipelineEvent,
   VoteRecordedEvent,
 }
+
+import com.repcheck.utils.errors.{ErrorClass, ErrorClassifier, RetryConfig, RetryWrapper}
 
 class DefaultIngestionEventPublisher[F[_]: Async](
   publisher: PubSubEventPublisher[F],
