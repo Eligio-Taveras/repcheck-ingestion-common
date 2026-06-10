@@ -14,16 +14,15 @@ import repcheck.pipeline.models.workflow.state.WorkflowStepStatus
  * pre-built result stream and logger so tests can inject stubs without constructing the full dependency graph. When a
  * [[WorkflowStateUpdater]] is provided, records step start/completion/failure in `workflow_run_steps`.
  *
- * The result stream is consumed via `compile.fold` over a small accumulator — never `compile.toList` — so memory stays
- * bounded regardless of how many events the run processes. `errorCounts` keeps only the `(reason -> count)` map, not
- * the full failed payloads: O(distinct-reason-strings), not O(total events). Per-item failure detail remains visible in
- * the item-level logs each pipeline already emits with correlation IDs.
+ * The result stream is consumed via `compile.fold` over a bounded [[StreamingStats]] accumulator — never
+ * `compile.toList` — so memory stays bounded regardless of how many events the run processes. Per-item failure detail
+ * remains visible in the item-level logs each pipeline already emits with correlation IDs.
  *
  * Semantics, unified across all pipelines:
  *   - Skipped rolls into succeeded (an idempotent re-delivery is a healthy no-op, not a separate bucket)
  *   - empty stream -> Completed; all failed -> Failed; some failed -> CompletedWithErrors; none failed -> Completed
  *   - exit code: Success iff itemsFailed == 0
- *   - logging: one summary line; one extra failure-details line (reason -> count) only when failures occurred
+ *   - logging: one summary line; one extra failure-reasons line (reason -> count) only when failures occurred
  */
 object PipelineExecutor {
 
@@ -48,7 +47,7 @@ object PipelineExecutor {
     for {
       _           <- recordStepStarted(workflowStateUpdater, runId, pipelineName)
       startedAt   <- Async[F].realTimeInstant
-      stats       <- foldStream(resultStream, logger, logCtx)
+      stats       <- accumulateResults(resultStream, logger, logCtx)
       completedAt <- Async[F].realTimeInstant
       summary = buildSummary(stats, stepRunId, pipelineName, startedAt, completedAt)
       _ <- logSummary(logger, logCtx, summary)
@@ -59,48 +58,12 @@ object PipelineExecutor {
     } yield exitCode
   }
 
-  /** Stream-friendly counters: bounded memory, only the reason->count map survives the fold. */
-  final private[execution] case class StreamingStats(
-    itemsProcessed: Int,
-    itemsSucceeded: Int,
-    itemsFailed: Int,
-    errorCounts: Map[String, Int],
-  )
-
-  private[execution] object StreamingStats {
-    val empty: StreamingStats = StreamingStats(0, 0, 0, Map.empty)
-  }
-
-  private[execution] def addResult(stats: StreamingStats, result: ProcessingResult): StreamingStats =
-    result match {
-      case _: ProcessingResult.Succeeded =>
-        stats.copy(
-          itemsProcessed = stats.itemsProcessed + 1,
-          itemsSucceeded = stats.itemsSucceeded + 1,
-        )
-      case _: ProcessingResult.Skipped =>
-        stats.copy(
-          itemsProcessed = stats.itemsProcessed + 1,
-          itemsSucceeded = stats.itemsSucceeded + 1,
-        )
-      case f: ProcessingResult.Failed =>
-        val updatedCounts = stats.errorCounts.updatedWith(f.reason) {
-          case Some(n) => Some(n + 1)
-          case None    => Some(1)
-        }
-        stats.copy(
-          itemsProcessed = stats.itemsProcessed + 1,
-          itemsFailed = stats.itemsFailed + 1,
-          errorCounts = updatedCounts,
-        )
-    }
-
-  private def foldStream[F[_]: Async](
+  private def accumulateResults[F[_]: Async](
     resultStream: Stream[F, ProcessingResult],
     logger: PipelineLogger[F],
     logCtx: LogContext,
   ): F[StreamingStats] =
-    resultStream.compile.fold(StreamingStats.empty)(addResult).handleErrorWith { error =>
+    resultStream.compile.fold(StreamingStats.empty)(_.add(_)).handleErrorWith { error =>
       logger.error(logCtx, s"Stream failed: ${error.getMessage}", Some(error)) *>
         Async[F].raiseError(error)
     }

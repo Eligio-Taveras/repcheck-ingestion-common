@@ -148,7 +148,7 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
     val now = java.time.Instant.parse("2026-06-10T00:00:00Z")
     def summary(processed: Int, failed: Int) =
       PipelineExecutor.buildSummary(
-        PipelineExecutor.StreamingStats(processed, processed - failed, failed, Map.empty),
+        StreamingStats(processed, processed - failed, failed, Map.empty),
         stepRunId = 42L,
         pipelineName = "p",
         startedAt = now,
