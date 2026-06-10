@@ -33,6 +33,7 @@ lazy val commonSettings = Seq(
   resolvers ++= Seq(
     "GitHub Packages - shared-models" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-shared-models",
     "GitHub Packages - pipeline-models" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-pipeline-models",
+    "GitHub Packages - repcheck-utils" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-utils",
     "GitHub Packages - db-migrations" at "https://maven.pkg.github.com/Eligio-Taveras/repcheck-db-migrations",
   ),
   libraryDependencies ++= Seq(
@@ -88,7 +89,8 @@ lazy val repcheckingestioncommon = (project in file("repcheck-ingestion-common")
     ,
     libraryDependencies += "com.h2database" % "h2" % "2.2.224" % Test,
     libraryDependencies += "com.repcheck" %% "repchecksharedmodels" % "0.1.16",
-    libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.17",
+    libraryDependencies += "com.repcheck" %% "repcheck-pipeline-models" % "0.1.28",
+    libraryDependencies += "com.repcheck" %% "repcheck-utils" % "0.1.1", // base behaviors (errors)
     libraryDependencies += "com.repcheck" %% "repcheck-db-migrations-runner" % "0.1.15" % Test,
     // Circe semi-auto derivation for large case classes
     scalacOptions += "-Xmax-inlines:64",

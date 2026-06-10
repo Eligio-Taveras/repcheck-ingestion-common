@@ -14,7 +14,8 @@ import fs2.Stream
 
 import org.typelevel.log4cats.Logger
 import repcheck.ingestion.common.errors.XmlParseFailed
-import repcheck.pipeline.models.errors.RetryConfig
+
+import com.repcheck.utils.errors.RetryConfig
 
 trait XmlFeedClient[F[_]] {
   def fetchXml(url: String): F[Elem]

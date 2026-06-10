@@ -2,7 +2,8 @@ package repcheck.ingestion.common.api
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import repcheck.pipeline.models.errors.ErrorClass
+
+import com.repcheck.utils.errors.ErrorClass
 
 class CongressGovErrorClassifierSpec extends AnyFlatSpec with Matchers {
 
