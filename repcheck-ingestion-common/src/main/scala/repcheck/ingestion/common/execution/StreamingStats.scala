@@ -2,12 +2,7 @@ package repcheck.ingestion.common.execution
 
 import repcheck.pipeline.models.metadata.ProcessingResult
 
-/**
- * Stream-friendly run counters, accumulated one [[ProcessingResult]] at a time by [[PipelineExecutor]]'s
- * `compile.fold`. Bounded memory: `errorCounts` keeps only the `(reason -> count)` map — O(distinct-reason-strings),
- * never the full failed payloads. Skipped rolls into succeeded (an idempotent re-delivery is a healthy no-op, not a
- * separate bucket).
- */
+/** Bounded-memory run counters: errorCounts holds reason -> count, never the failed payloads. */
 final private[execution] case class StreamingStats(
   itemsProcessed: Int,
   itemsSucceeded: Int,
@@ -20,6 +15,7 @@ final private[execution] case class StreamingStats(
       case _: ProcessingResult.Succeeded =>
         copy(itemsProcessed = itemsProcessed + 1, itemsSucceeded = itemsSucceeded + 1)
       case _: ProcessingResult.Skipped =>
+        // an idempotent re-delivery is a healthy no-op, not a separate bucket
         copy(itemsProcessed = itemsProcessed + 1, itemsSucceeded = itemsSucceeded + 1)
       case f: ProcessingResult.Failed =>
         val updatedCounts = errorCounts.updatedWith(f.reason) {

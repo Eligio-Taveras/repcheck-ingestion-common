@@ -10,30 +10,12 @@ import repcheck.pipeline.models.metadata.{ProcessingResult, StepRunSummary}
 import repcheck.pipeline.models.workflow.state.WorkflowStepStatus
 
 /**
- * Canonical pipeline execution logic, consolidated from the nine near-identical per-pipeline copies (D-IC). Accepts a
- * pre-built result stream and logger so tests can inject stubs without constructing the full dependency graph. When a
- * [[WorkflowStateUpdater]] is provided, records step start/completion/failure in `workflow_run_steps`.
- *
- * The result stream is consumed via `compile.fold` over a bounded [[StreamingStats]] accumulator — never
- * `compile.toList` — so memory stays bounded regardless of how many events the run processes. Per-item failure detail
- * remains visible in the item-level logs each pipeline already emits with correlation IDs.
- *
- * Semantics, unified across all pipelines:
- *   - Skipped rolls into succeeded (an idempotent re-delivery is a healthy no-op, not a separate bucket)
- *   - empty stream -> Completed; all failed -> Failed; some failed -> CompletedWithErrors; none failed -> Completed
- *   - exit code: Success iff itemsFailed == 0
- *   - logging: one summary line; one extra failure-reasons line (reason -> count) only when failures occurred
+ * Canonical pipeline execution, replacing the nine per-pipeline copies. Consumes the result stream via `compile.fold` —
+ * never `compile.toList` — so memory stays bounded however many events the run processes; per-item failure detail lives
+ * in the item-level logs, not here.
  */
 object PipelineExecutor {
 
-  /**
-   * @param runId
-   *   workflow-run identifier from the IOApp's CLI args, as the String the [[WorkflowStateUpdater]] key expects. Pass
-   *   "0" when no workflow registrar is in scope.
-   * @param stepRunId
-   *   workflow_run_steps row identifier, stored on the [[StepRunSummary]]. Defaults to `0L` — placeholder used by
-   *   pipelines that do not wire that table yet.
-   */
   def execute[F[_]: Async](
     resultStream: Stream[F, ProcessingResult],
     logger: PipelineLogger[F],
