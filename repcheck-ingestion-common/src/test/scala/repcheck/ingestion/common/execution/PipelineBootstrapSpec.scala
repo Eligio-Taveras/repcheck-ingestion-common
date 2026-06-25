@@ -8,45 +8,52 @@ import pureconfig.ConfigReader
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.db.DatabaseConfig
-import repcheck.ingestion.common.errors.{ConfigLoadFailed, RunIdMissing}
+import repcheck.ingestion.common.errors.{ConfigLoadFailed, RunIdMissing, StepRunIdInvalid}
 
 class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
 
+  // Backed by src/test/resources/application.conf (api-key=default-key, max-items=10),
+  // loaded through ConfigSource.default inside loadConfig.
   final case class SampleConfig(apiKey: String, maxItems: Int) derives ConfigReader
 
-  "loadConfig" should "parse a valid JSON argument into a typed config" in {
+  "loadConfig" should "load defaults from application.conf when args(0) is empty" in {
+    val result = PipelineBootstrap.loadConfig[IO, SampleConfig](List.empty).unsafeRunSync()
+    val _      = result.apiKey shouldBe "default-key"
+    result.maxItems shouldBe 10
+  }
+
+  it should "load defaults when args(0) is a blank string" in {
+    val result = PipelineBootstrap.loadConfig[IO, SampleConfig](List("   ")).unsafeRunSync()
+    val _      = result.apiKey shouldBe "default-key"
+    result.maxItems shouldBe 10
+  }
+
+  it should "let an args(0) JSON override take precedence over the application.conf default" in {
+    val json   = """{"api-key":"override-key"}"""
+    val result = PipelineBootstrap.loadConfig[IO, SampleConfig](List(json)).unsafeRunSync()
+    // api-key overridden by the arg; max-items still falls back to the default.
+    val _ = result.apiKey shouldBe "override-key"
+    result.maxItems shouldBe 10
+  }
+
+  it should "override every field when args(0) supplies all of them" in {
     val json   = """{"api-key":"abc","max-items":50}"""
     val result = PipelineBootstrap.loadConfig[IO, SampleConfig](List(json)).unsafeRunSync()
     val _      = result.apiKey shouldBe "abc"
     result.maxItems shouldBe 50
   }
 
-  it should "raise ConfigLoadFailed when args is empty" in {
-    val attempt = PipelineBootstrap.loadConfig[IO, SampleConfig](List.empty).attempt.unsafeRunSync()
-    val _       = attempt.isLeft shouldBe true
-    val err     = attempt.swap.getOrElse(fail("expected error"))
-    val _       = err shouldBe a[ConfigLoadFailed]
-    err.getMessage should include("no arguments")
-  }
-
-  it should "raise ConfigLoadFailed when the payload is not parseable as HOCON/JSON" in {
-    // A raw word cannot be coerced into a case class shape.
-    val attempt = PipelineBootstrap.loadConfig[IO, SampleConfig](List("not json")).attempt.unsafeRunSync()
-    val _       = attempt.isLeft shouldBe true
-    attempt.swap.getOrElse(fail("expected error")) shouldBe a[ConfigLoadFailed]
-  }
-
-  it should "raise ConfigLoadFailed when JSON is missing required fields" in {
+  it should "raise ConfigLoadFailed when an override sets a field to the wrong type" in {
     val attempt = PipelineBootstrap
-      .loadConfig[IO, SampleConfig](List("""{"api-key":"abc"}"""))
+      .loadConfig[IO, SampleConfig](List("""{"max-items":"not-a-number"}"""))
       .attempt
       .unsafeRunSync()
     val _ = attempt.isLeft shouldBe true
     attempt.swap.getOrElse(fail("expected error")) shouldBe a[ConfigLoadFailed]
   }
 
-  it should "raise ConfigLoadFailed wrapping parse exceptions with a cause" in {
-    // A completely malformed payload with unbalanced braces forces the Typesafe parser to throw.
+  it should "raise ConfigLoadFailed wrapping parse exceptions for malformed HOCON/JSON" in {
+    // Unbalanced braces force the Typesafe parser to throw.
     val attempt = PipelineBootstrap
       .loadConfig[IO, SampleConfig](List("{\"api-key\":\"abc\""))
       .attempt
@@ -56,14 +63,14 @@ class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
     err shouldBe a[ConfigLoadFailed]
   }
 
-  "extractRunId" should "return the second CLI argument" in {
-    val result = PipelineBootstrap.extractRunId[IO](List("config-json", "run-123")).unsafeRunSync()
-    result shouldBe "run-123"
+  "extractRunId" should "parse the second CLI argument as a Long" in {
+    val result = PipelineBootstrap.extractRunId[IO](List("config-json", "123")).unsafeRunSync()
+    result shouldBe 123L
   }
 
   it should "trim surrounding whitespace" in {
-    val result = PipelineBootstrap.extractRunId[IO](List("cfg", "   run-42   ")).unsafeRunSync()
-    result shouldBe "run-42"
+    val result = PipelineBootstrap.extractRunId[IO](List("cfg", "   42   ")).unsafeRunSync()
+    result shouldBe 42L
   }
 
   it should "raise RunIdMissing when only one argument is provided" in {
@@ -72,8 +79,14 @@ class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
     attempt.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
   }
 
-  it should "raise RunIdMissing when the run ID is a blank string" in {
+  it should "raise RunIdMissing when the run ID is blank" in {
     val attempt = PipelineBootstrap.extractRunId[IO](List("config-json", "   ")).attempt.unsafeRunSync()
+    val _       = attempt.isLeft shouldBe true
+    attempt.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
+  }
+
+  it should "raise RunIdMissing when the run ID is non-numeric" in {
+    val attempt = PipelineBootstrap.extractRunId[IO](List("config-json", "run-123")).attempt.unsafeRunSync()
     val _       = attempt.isLeft shouldBe true
     attempt.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
   }
@@ -82,6 +95,40 @@ class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
     val attempt = PipelineBootstrap.extractRunId[IO](List.empty).attempt.unsafeRunSync()
     val _       = attempt.isLeft shouldBe true
     attempt.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
+  }
+
+  "extractStepRunId" should "parse the third CLI argument as a Long" in {
+    val result = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1", "456")).unsafeRunSync()
+    result shouldBe 456L
+  }
+
+  it should "trim surrounding whitespace" in {
+    val result = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1", "  77  ")).unsafeRunSync()
+    result shouldBe 77L
+  }
+
+  it should "raise StepRunIdInvalid when the third argument is missing" in {
+    val attempt = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1")).attempt.unsafeRunSync()
+    val _       = attempt.isLeft shouldBe true
+    attempt.swap.getOrElse(fail("expected error")) shouldBe a[StepRunIdInvalid]
+  }
+
+  it should "raise StepRunIdInvalid when the step run ID is blank" in {
+    val attempt = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1", "   ")).attempt.unsafeRunSync()
+    val _       = attempt.isLeft shouldBe true
+    attempt.swap.getOrElse(fail("expected error")) shouldBe a[StepRunIdInvalid]
+  }
+
+  it should "raise StepRunIdInvalid when the step run ID is non-numeric" in {
+    val attempt = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1", "step-9")).attempt.unsafeRunSync()
+    val _       = attempt.isLeft shouldBe true
+    attempt.swap.getOrElse(fail("expected error")) shouldBe a[StepRunIdInvalid]
+  }
+
+  it should "raise StepRunIdInvalid when args has fewer than three elements" in {
+    val attempt = PipelineBootstrap.extractStepRunId[IO](List.empty).attempt.unsafeRunSync()
+    val _       = attempt.isLeft shouldBe true
+    attempt.swap.getOrElse(fail("expected error")) shouldBe a[StepRunIdInvalid]
   }
 
   "initTransactor" should "produce a Resource that can be allocated" in {

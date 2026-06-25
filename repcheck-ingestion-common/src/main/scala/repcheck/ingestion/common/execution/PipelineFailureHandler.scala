@@ -11,7 +11,7 @@ package repcheck.ingestion.common.execution
 trait PipelineFailureHandler[F[_]] {
 
   def handleFailure(
-    runId: String,
+    runId: Long,
     stepName: String,
     originalMessage: String,
     error: Throwable,

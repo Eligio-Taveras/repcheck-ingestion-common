@@ -9,7 +9,6 @@ import doobie.util.transactor.Transactor
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.db.TransactorResource
-import repcheck.ingestion.common.errors.RunIdMissing
 import repcheck.ingestion.common.testing.{DockerPostgresSpec, DockerRequired}
 
 class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPostgresSpec {
@@ -68,7 +67,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     withFixture { (xa, updater, runId) =>
       val step = "members-pipeline"
       for {
-        _      <- updater.recordStepStarted(runId.toString, step)
+        _      <- updater.recordStepStarted(runId, step)
         status <- readStatus(xa, runId, step)
       } yield status shouldBe Some("running")
     }
@@ -78,8 +77,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     withFixture { (xa, updater, runId) =>
       val step = "votes-pipeline"
       for {
-        _     <- updater.recordStepStarted(runId.toString, step)
-        _     <- updater.recordStepStarted(runId.toString, step)
+        _     <- updater.recordStepStarted(runId, step)
+        _     <- updater.recordStepStarted(runId, step)
         count <- countRows(xa, runId, step)
       } yield count shouldBe 1
     }
@@ -89,8 +88,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     withFixture { (xa, updater, runId) =>
       val step = "bills-pipeline"
       for {
-        _              <- updater.recordStepStarted(runId.toString, step)
-        _              <- updater.recordStepCompleted(runId.toString, step)
+        _              <- updater.recordStepStarted(runId, step)
+        _              <- updater.recordStepCompleted(runId, step)
         status         <- readStatus(xa, runId, step)
         completedAtSet <- readCompletedAtPresent(xa, runId, step)
       } yield {
@@ -104,8 +103,8 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     withFixture { (xa, updater, runId) =>
       val step = "amendments-pipeline"
       for {
-        _            <- updater.recordStepStarted(runId.toString, step)
-        _            <- updater.recordStepFailed(runId.toString, step, "connection timeout")
+        _            <- updater.recordStepStarted(runId, step)
+        _            <- updater.recordStepFailed(runId, step, "connection timeout")
         status       <- readStatus(xa, runId, step)
         errorMessage <- readErrorMessage(xa, runId, step)
       } yield {
@@ -119,10 +118,10 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
     withFixture { (_, updater, runId) =>
       val step = "members-pipeline"
       for {
-        _     <- updater.recordStepStarted(runId.toString, step)
-        one   <- updater.incrementRetryCount(runId.toString, step)
-        two   <- updater.incrementRetryCount(runId.toString, step)
-        three <- updater.incrementRetryCount(runId.toString, step)
+        _     <- updater.recordStepStarted(runId, step)
+        one   <- updater.incrementRetryCount(runId, step)
+        two   <- updater.incrementRetryCount(runId, step)
+        three <- updater.incrementRetryCount(runId, step)
       } yield {
         val _ = one shouldBe 1
         val _ = two shouldBe 2
@@ -132,17 +131,17 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "getRetryCount" should "return 0 when the step has never been recorded" taggedAs DockerRequired in {
-    withFixture((_, updater, _) => updater.getRetryCount("99999", "never-seen").map(_ shouldBe 0))
+    withFixture((_, updater, _) => updater.getRetryCount(99999L, "never-seen").map(_ shouldBe 0))
   }
 
   it should "return the current value after increments" taggedAs DockerRequired in {
     withFixture { (_, updater, runId) =>
       val step = "votes-pipeline"
       for {
-        _       <- updater.recordStepStarted(runId.toString, step)
-        _       <- updater.incrementRetryCount(runId.toString, step)
-        _       <- updater.incrementRetryCount(runId.toString, step)
-        current <- updater.getRetryCount(runId.toString, step)
+        _       <- updater.recordStepStarted(runId, step)
+        _       <- updater.incrementRetryCount(runId, step)
+        _       <- updater.incrementRetryCount(runId, step)
+        current <- updater.getRetryCount(runId, step)
       } yield current shouldBe 2
     }
   }
@@ -152,55 +151,16 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
       val stepA = "step-a"
       val stepB = "step-b"
       for {
-        _       <- updater.recordStepStarted(runId.toString, stepA)
-        _       <- updater.recordStepStarted(runId.toString, stepB)
-        _       <- updater.recordStepCompleted(runId.toString, stepA)
-        _       <- updater.recordStepFailed(runId.toString, stepB, "boom")
+        _       <- updater.recordStepStarted(runId, stepA)
+        _       <- updater.recordStepStarted(runId, stepB)
+        _       <- updater.recordStepCompleted(runId, stepA)
+        _       <- updater.recordStepFailed(runId, stepB, "boom")
         statusA <- readStatus(xa, runId, stepA)
         statusB <- readStatus(xa, runId, stepB)
       } yield {
         val _ = statusA shouldBe Some("completed")
         statusB shouldBe Some("failed")
       }
-    }
-  }
-
-  "WorkflowStateUpdater" should "raise RunIdMissing when the run ID is not a valid Long" taggedAs DockerRequired in {
-    withFixture { (_, updater, _) =>
-      updater
-        .recordStepStarted("not-a-number", "step")
-        .attempt
-        .map { result =>
-          val _ = result.isLeft shouldBe true
-          result.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
-        }
-    }
-  }
-
-  it should "raise RunIdMissing on incrementRetryCount with invalid ID" taggedAs DockerRequired in {
-    withFixture { (_, updater, _) =>
-      updater.incrementRetryCount("not-a-number", "step").attempt.map { result =>
-        val _ = result.isLeft shouldBe true
-        result.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
-      }
-    }
-  }
-
-  it should "raise RunIdMissing on getRetryCount with invalid ID" taggedAs DockerRequired in {
-    withFixture { (_, updater, _) =>
-      updater.getRetryCount("bad", "step").attempt.map(result => result.isLeft shouldBe true)
-    }
-  }
-
-  it should "raise RunIdMissing on recordStepCompleted with invalid ID" taggedAs DockerRequired in {
-    withFixture { (_, updater, _) =>
-      updater.recordStepCompleted("bad", "step").attempt.map(result => result.isLeft shouldBe true)
-    }
-  }
-
-  it should "raise RunIdMissing on recordStepFailed with invalid ID" taggedAs DockerRequired in {
-    withFixture { (_, updater, _) =>
-      updater.recordStepFailed("bad", "step", "error").attempt.map(result => result.isLeft shouldBe true)
     }
   }
 

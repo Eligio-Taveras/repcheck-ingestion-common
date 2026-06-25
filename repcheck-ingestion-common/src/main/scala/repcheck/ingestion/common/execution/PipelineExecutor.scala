@@ -20,11 +20,11 @@ object PipelineExecutor {
     resultStream: Stream[F, ProcessingResult],
     logger: PipelineLogger[F],
     pipelineName: String,
-    runId: String,
+    runId: Long,
     stepRunId: Long = 0L,
     workflowStateUpdater: Option[WorkflowStateUpdater[F]] = None,
   ): F[ExitCode] = {
-    val logCtx = LogContext(runId = runId, stepName = pipelineName)
+    val logCtx = LogContext(runId = runId.toString, stepName = pipelineName)
 
     for {
       _           <- recordStepStarted(workflowStateUpdater, runId, pipelineName)
@@ -106,14 +106,14 @@ object PipelineExecutor {
 
   private def recordStepStarted[F[_]: Async](
     updater: Option[WorkflowStateUpdater[F]],
-    runId: String,
+    runId: Long,
     stepName: String,
   ): F[Unit] =
     updater.traverse_(_.recordStepStarted(runId, stepName))
 
   private def recordStepOutcome[F[_]: Async](
     updater: Option[WorkflowStateUpdater[F]],
-    runId: String,
+    runId: Long,
     stepName: String,
     summary: StepRunSummary,
   ): F[Unit] =
