@@ -1,7 +1,5 @@
 package repcheck.ingestion.common.execution
 
-import scala.util.control.NonFatal
-
 import cats.effect.{Async, Resource, Sync}
 import cats.syntax.all._
 
@@ -40,21 +38,12 @@ object PipelineBootstrap {
         case None       => ConfigSource.default
       }
 
-    val attempt: F[Either[ConfigLoadFailed, C]] = Sync[F].delay {
-      try
-        source.load[C] match {
-          case Right(config) => Right(config)
-          case Left(failures) =>
-            Left(ConfigLoadFailed(failures.toList.map(_.description).mkString("; ")))
-        }
-      catch {
-        case NonFatal(ex) =>
-          Left(ConfigLoadFailed(s"failed to parse config payload: ${ex.getMessage}", Some(ex)))
-      }
-    }
-    attempt.flatMap {
+    // pureconfig captures every parse/decode error into the Either; Sync.delay additionally lifts any unexpected
+    // runtime throw into F's error channel, so an explicit try/catch would be unreachable.
+    Sync[F].delay(source.load[C]).flatMap {
       case Right(config) => Sync[F].pure(config)
-      case Left(err)     => Sync[F].raiseError[C](err)
+      case Left(failures) =>
+        Sync[F].raiseError[C](ConfigLoadFailed(failures.toList.map(_.description).mkString("; ")))
     }
   }
 

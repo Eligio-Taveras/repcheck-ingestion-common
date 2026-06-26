@@ -52,8 +52,8 @@ class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
     attempt.swap.getOrElse(fail("expected error")) shouldBe a[ConfigLoadFailed]
   }
 
-  it should "raise ConfigLoadFailed wrapping parse exceptions for malformed HOCON/JSON" in {
-    // Unbalanced braces force the Typesafe parser to throw.
+  it should "raise ConfigLoadFailed for malformed HOCON/JSON in args(0)" in {
+    // Unbalanced braces — pureconfig captures the parse error as a Left, which becomes ConfigLoadFailed.
     val attempt = PipelineBootstrap
       .loadConfig[IO, SampleConfig](List("{\"api-key\":\"abc\""))
       .attempt
