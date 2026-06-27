@@ -25,7 +25,7 @@ class DefaultPipelineFailureHandler[F[_]: Monad](
 ) extends PipelineFailureHandler[F] {
 
   override def handleFailure(
-    runId: String,
+    runId: Long,
     stepName: String,
     originalMessage: String,
     error: Throwable,

@@ -32,11 +32,11 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
       logHandler = None,
     )
     new WorkflowStateUpdater[IO](inertXa, PipelineFailureHandlerConfig(maxRetries = 1)) {
-      override def recordStepStarted(runId: String, stepName: String): IO[Unit] =
+      override def recordStepStarted(runId: Long, stepName: String): IO[Unit] =
         calls.update(_ :+ s"started:$runId:$stepName")
-      override def recordStepCompleted(runId: String, stepName: String): IO[Unit] =
+      override def recordStepCompleted(runId: Long, stepName: String): IO[Unit] =
         calls.update(_ :+ s"completed:$runId:$stepName")
-      override def recordStepFailed(runId: String, stepName: String, error: String): IO[Unit] =
+      override def recordStepFailed(runId: Long, stepName: String, error: String): IO[Unit] =
         calls.update(_ :+ s"failed:$runId:$stepName:$error")
     }
   }
@@ -51,7 +51,7 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
         Stream.emits(results).covary[IO],
         capturingLogger(messages),
         "test-pipeline",
-        runId = "7",
+        runId = 7L,
         stepRunId = 42L,
         workflowStateUpdater = updater,
       )
@@ -109,7 +109,7 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
           Stream.raiseError[IO](boom),
           capturingLogger(messages),
           "test-pipeline",
-          runId = "7",
+          runId = 7L,
         )
         .attempt
       logged <- messages.get
