@@ -9,6 +9,7 @@ import doobie.util.transactor.Transactor
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.db.TransactorResource
+import repcheck.ingestion.common.ids.RunId
 import repcheck.ingestion.common.testing.{DockerPostgresSpec, DockerRequired}
 
 class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPostgresSpec {
@@ -21,7 +22,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
       .withUniqueGeneratedKeys[Long]("id")
       .transact(xa)
 
-  private def withFixture[A](block: (Transactor[IO], WorkflowStateUpdater[IO], Long) => IO[A]): A =
+  private def withFixture[A](block: (Transactor[IO], WorkflowStateUpdater[IO], RunId) => IO[A]): A =
     TransactorResource
       .makeTransactor[IO](
         driverClassName = "org.postgresql.Driver",
@@ -34,34 +35,42 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
         for {
           _      <- sql"TRUNCATE TABLE workflow_run_steps, workflow_runs CASCADE".update.run.transact(xa)
           runId  <- createWorkflowRun(xa, "test-workflow")
-          result <- block(xa, new WorkflowStateUpdater[IO](xa, testConfig), runId)
+          result <- block(xa, new WorkflowStateUpdater[IO](xa, testConfig), RunId(runId))
         } yield result
       }
       .unsafeRunSync()
 
-  private def readStatus(xa: Transactor[IO], runId: Long, step: String): IO[Option[String]] =
-    sql"""SELECT status FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
+  private def readStatus(xa: Transactor[IO], runId: RunId, step: String): IO[Option[String]] = {
+    val id = runId.value
+    sql"""SELECT status FROM workflow_run_steps WHERE workflow_run_id = $id AND step_name = $step"""
       .query[String]
       .option
       .transact(xa)
+  }
 
-  private def readCompletedAtPresent(xa: Transactor[IO], runId: Long, step: String): IO[Boolean] =
-    sql"""SELECT (completed_at IS NOT NULL) FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
+  private def readCompletedAtPresent(xa: Transactor[IO], runId: RunId, step: String): IO[Boolean] = {
+    val id = runId.value
+    sql"""SELECT (completed_at IS NOT NULL) FROM workflow_run_steps WHERE workflow_run_id = $id AND step_name = $step"""
       .query[Boolean]
       .unique
       .transact(xa)
+  }
 
-  private def readErrorMessage(xa: Transactor[IO], runId: Long, step: String): IO[Option[String]] =
-    sql"""SELECT error_message FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
+  private def readErrorMessage(xa: Transactor[IO], runId: RunId, step: String): IO[Option[String]] = {
+    val id = runId.value
+    sql"""SELECT error_message FROM workflow_run_steps WHERE workflow_run_id = $id AND step_name = $step"""
       .query[Option[String]]
       .unique
       .transact(xa)
+  }
 
-  private def countRows(xa: Transactor[IO], runId: Long, step: String): IO[Int] =
-    sql"""SELECT COUNT(*) FROM workflow_run_steps WHERE workflow_run_id = $runId AND step_name = $step"""
+  private def countRows(xa: Transactor[IO], runId: RunId, step: String): IO[Int] = {
+    val id = runId.value
+    sql"""SELECT COUNT(*) FROM workflow_run_steps WHERE workflow_run_id = $id AND step_name = $step"""
       .query[Int]
       .unique
       .transact(xa)
+  }
 
   "recordStepStarted" should "insert a new row with status Running" taggedAs DockerRequired in {
     withFixture { (xa, updater, runId) =>
@@ -131,7 +140,7 @@ class WorkflowStateUpdaterSpec extends AnyFlatSpec with Matchers with DockerPost
   }
 
   "getRetryCount" should "return 0 when the step has never been recorded" taggedAs DockerRequired in {
-    withFixture((_, updater, _) => updater.getRetryCount(99999L, "never-seen").map(_ shouldBe 0))
+    withFixture((_, updater, _) => updater.getRetryCount(RunId(99999L), "never-seen").map(_ shouldBe 0))
   }
 
   it should "return the current value after increments" taggedAs DockerRequired in {

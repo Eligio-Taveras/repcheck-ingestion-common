@@ -9,6 +9,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.db.DatabaseConfig
 import repcheck.ingestion.common.errors.{ConfigLoadFailed, RunIdMissing, StepRunIdInvalid}
+import repcheck.ingestion.common.ids.{RunId, StepRunId}
 
 class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
 
@@ -63,14 +64,15 @@ class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
     err shouldBe a[ConfigLoadFailed]
   }
 
-  "extractRunId" should "parse the second CLI argument as a Long" in {
+  "extractRunId" should "parse the second CLI argument into a RunId wrapping the Long" in {
     val result = PipelineBootstrap.extractRunId[IO](List("config-json", "123")).unsafeRunSync()
-    result shouldBe 123L
+    val _      = result shouldBe RunId(123L)
+    result.value shouldBe 123L
   }
 
   it should "trim surrounding whitespace" in {
     val result = PipelineBootstrap.extractRunId[IO](List("cfg", "   42   ")).unsafeRunSync()
-    result shouldBe 42L
+    result.value shouldBe 42L
   }
 
   it should "raise RunIdMissing when only one argument is provided" in {
@@ -97,14 +99,15 @@ class PipelineBootstrapSpec extends AnyFlatSpec with Matchers {
     attempt.swap.getOrElse(fail("expected error")) shouldBe a[RunIdMissing]
   }
 
-  "extractStepRunId" should "parse the third CLI argument as a Long" in {
+  "extractStepRunId" should "parse the third CLI argument into a StepRunId wrapping the Long" in {
     val result = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1", "456")).unsafeRunSync()
-    result shouldBe 456L
+    val _      = result shouldBe StepRunId(456L)
+    result.value shouldBe 456L
   }
 
   it should "trim surrounding whitespace" in {
     val result = PipelineBootstrap.extractStepRunId[IO](List("cfg", "1", "  77  ")).unsafeRunSync()
-    result shouldBe 77L
+    result.value shouldBe 77L
   }
 
   it should "raise StepRunIdInvalid when the third argument is missing" in {

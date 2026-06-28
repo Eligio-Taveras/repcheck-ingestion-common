@@ -1,5 +1,7 @@
 package repcheck.ingestion.common.execution
 
+import repcheck.ingestion.common.ids.RunId
+
 /**
  * Encapsulates the retry-or-fail decision per Component 2 §2.3.
  *
@@ -11,7 +13,7 @@ package repcheck.ingestion.common.execution
 trait PipelineFailureHandler[F[_]] {
 
   def handleFailure(
-    runId: Long,
+    runId: RunId,
     stepName: String,
     originalMessage: String,
     error: Throwable,

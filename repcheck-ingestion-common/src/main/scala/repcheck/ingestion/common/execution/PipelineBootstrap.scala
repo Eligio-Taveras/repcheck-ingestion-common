@@ -9,6 +9,7 @@ import pureconfig.{ConfigObjectSource, ConfigReader, ConfigSource}
 
 import repcheck.ingestion.common.db.{DatabaseConfig, TransactorResource}
 import repcheck.ingestion.common.errors.{ConfigLoadFailed, RunIdMissing, StepRunIdInvalid}
+import repcheck.ingestion.common.ids.{RunId, StepRunId}
 
 /**
  * Standard bootstrap sequence that every pipeline application follows.
@@ -56,11 +57,11 @@ object PipelineBootstrap {
    *
    * Strict: fails with [[RunIdMissing]] if the run ID is missing, blank, or not a valid `Long`.
    */
-  def extractRunId[F[_]: Sync](args: List[String]): F[Long] = {
+  def extractRunId[F[_]: Sync](args: List[String]): F[RunId] = {
     val raw = args.lift(1).map(_.trim).getOrElse("")
     raw.toLongOption match {
-      case Some(id) => Sync[F].pure(id)
-      case None     => Sync[F].raiseError[Long](RunIdMissing(s"run ID (args(1)) missing or non-numeric: '$raw'"))
+      case Some(id) => Sync[F].pure(RunId(id))
+      case None     => Sync[F].raiseError[RunId](RunIdMissing(s"run ID (args(1)) missing or non-numeric: '$raw'"))
     }
   }
 
@@ -72,11 +73,12 @@ object PipelineBootstrap {
    *
    * Strict: fails with [[StepRunIdInvalid]] if the step run ID is missing, blank, or not a valid `Long`.
    */
-  def extractStepRunId[F[_]: Sync](args: List[String]): F[Long] = {
+  def extractStepRunId[F[_]: Sync](args: List[String]): F[StepRunId] = {
     val raw = args.lift(2).map(_.trim).getOrElse("")
     raw.toLongOption match {
-      case Some(id) => Sync[F].pure(id)
-      case None => Sync[F].raiseError[Long](StepRunIdInvalid(s"step run ID (args(2)) missing or non-numeric: '$raw'"))
+      case Some(id) => Sync[F].pure(StepRunId(id))
+      case None =>
+        Sync[F].raiseError[StepRunId](StepRunIdInvalid(s"step run ID (args(2)) missing or non-numeric: '$raw'"))
     }
   }
 
