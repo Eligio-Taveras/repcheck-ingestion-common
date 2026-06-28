@@ -9,6 +9,7 @@ import doobie.util.transactor.Transactor
 
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
+import repcheck.ingestion.common.ids.{RunId, StepRunId}
 import repcheck.ingestion.common.logging.{LogContext, PipelineLogger}
 import repcheck.pipeline.models.metadata.ProcessingResult
 import repcheck.pipeline.models.workflow.state.WorkflowStepStatus
@@ -32,12 +33,12 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
       logHandler = None,
     )
     new WorkflowStateUpdater[IO](inertXa, PipelineFailureHandlerConfig(maxRetries = 1)) {
-      override def recordStepStarted(runId: Long, stepName: String): IO[Unit] =
-        calls.update(_ :+ s"started:$runId:$stepName")
-      override def recordStepCompleted(runId: Long, stepName: String): IO[Unit] =
-        calls.update(_ :+ s"completed:$runId:$stepName")
-      override def recordStepFailed(runId: Long, stepName: String, error: String): IO[Unit] =
-        calls.update(_ :+ s"failed:$runId:$stepName:$error")
+      override def recordStepStarted(runId: RunId, stepName: String): IO[Unit] =
+        calls.update(_ :+ s"started:${runId.value.toString}:$stepName")
+      override def recordStepCompleted(runId: RunId, stepName: String): IO[Unit] =
+        calls.update(_ :+ s"completed:${runId.value.toString}:$stepName")
+      override def recordStepFailed(runId: RunId, stepName: String, error: String): IO[Unit] =
+        calls.update(_ :+ s"failed:${runId.value.toString}:$stepName:$error")
     }
   }
 
@@ -51,8 +52,8 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
         Stream.emits(results).covary[IO],
         capturingLogger(messages),
         "test-pipeline",
-        runId = 7L,
-        stepRunId = 42L,
+        runId = RunId(7L),
+        stepRunId = StepRunId(42L),
         workflowStateUpdater = updater,
       )
       logged <- messages.get
@@ -109,7 +110,7 @@ class PipelineExecutorSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers 
           Stream.raiseError[IO](boom),
           capturingLogger(messages),
           "test-pipeline",
-          runId = 7L,
+          runId = RunId(7L),
         )
         .attempt
       logged <- messages.get

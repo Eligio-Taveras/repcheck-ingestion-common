@@ -5,6 +5,7 @@ import cats.syntax.all._
 
 import fs2.Stream
 
+import repcheck.ingestion.common.ids.{RunId, StepRunId}
 import repcheck.ingestion.common.logging.{LogContext, PipelineLogger}
 import repcheck.pipeline.models.metadata.{ProcessingResult, StepRunSummary}
 import repcheck.pipeline.models.workflow.state.WorkflowStepStatus
@@ -20,18 +21,18 @@ object PipelineExecutor {
     resultStream: Stream[F, ProcessingResult],
     logger: PipelineLogger[F],
     pipelineName: String,
-    runId: Long,
-    stepRunId: Long = 0L,
+    runId: RunId,
+    stepRunId: StepRunId = StepRunId(0L),
     workflowStateUpdater: Option[WorkflowStateUpdater[F]] = None,
   ): F[ExitCode] = {
-    val logCtx = LogContext(runId = runId.toString, stepName = pipelineName)
+    val logCtx = LogContext(runId = runId.value.toString, stepName = pipelineName)
 
     for {
       _           <- recordStepStarted(workflowStateUpdater, runId, pipelineName)
       startedAt   <- Async[F].realTimeInstant
       stats       <- accumulateResults(resultStream, logger, logCtx)
       completedAt <- Async[F].realTimeInstant
-      summary = buildSummary(stats, stepRunId, pipelineName, startedAt, completedAt)
+      summary = buildSummary(stats, stepRunId.value, pipelineName, startedAt, completedAt)
       _ <- logSummary(logger, logCtx, summary)
       exitCode =
         if (summary.itemsFailed == 0) { ExitCode.Success }
@@ -106,14 +107,14 @@ object PipelineExecutor {
 
   private def recordStepStarted[F[_]: Async](
     updater: Option[WorkflowStateUpdater[F]],
-    runId: Long,
+    runId: RunId,
     stepName: String,
   ): F[Unit] =
     updater.traverse_(_.recordStepStarted(runId, stepName))
 
   private def recordStepOutcome[F[_]: Async](
     updater: Option[WorkflowStateUpdater[F]],
-    runId: Long,
+    runId: RunId,
     stepName: String,
     summary: StepRunSummary,
   ): F[Unit] =

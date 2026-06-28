@@ -4,6 +4,7 @@ import cats.Monad
 import cats.syntax.all._
 
 import repcheck.ingestion.common.events.PubSubEventPublisher
+import repcheck.ingestion.common.ids.RunId
 
 /**
  * Default [[PipelineFailureHandler]] implementation.
@@ -25,7 +26,7 @@ class DefaultPipelineFailureHandler[F[_]: Monad](
 ) extends PipelineFailureHandler[F] {
 
   override def handleFailure(
-    runId: Long,
+    runId: RunId,
     stepName: String,
     originalMessage: String,
     error: Throwable,

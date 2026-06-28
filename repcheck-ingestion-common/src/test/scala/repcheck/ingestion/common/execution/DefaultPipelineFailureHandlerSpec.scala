@@ -8,11 +8,12 @@ import doobie.util.transactor.Transactor
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import repcheck.ingestion.common.events.PubSubEventPublisher
+import repcheck.ingestion.common.ids.RunId
 
 class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
 
   private val topic   = "projects/test/topics/retries"
-  private val runId   = 1L
+  private val runId   = RunId(1L)
   private val step    = "bills-pipeline"
   private val origMsg = """{"naturalKey":"hr1-118"}"""
 
@@ -40,13 +41,13 @@ class DefaultPipelineFailureHandlerSpec extends AnyFlatSpec with Matchers {
       failure <- Ref.of[IO, Option[String]](None)
     } yield {
       val updater = new WorkflowStateUpdater[IO](stubXa, defaultConfig) {
-        override def recordStepStarted(runId: Long, stepName: String): IO[Unit]   = IO.unit
-        override def recordStepCompleted(runId: Long, stepName: String): IO[Unit] = IO.unit
-        override def recordStepFailed(runId: Long, stepName: String, error: String): IO[Unit] =
+        override def recordStepStarted(runId: RunId, stepName: String): IO[Unit]   = IO.unit
+        override def recordStepCompleted(runId: RunId, stepName: String): IO[Unit] = IO.unit
+        override def recordStepFailed(runId: RunId, stepName: String, error: String): IO[Unit] =
           failure.set(Some(error))
-        override def incrementRetryCount(runId: Long, stepName: String): IO[Int] =
+        override def incrementRetryCount(runId: RunId, stepName: String): IO[Int] =
           counter.updateAndGet(_ + 1)
-        override def getRetryCount(runId: Long, stepName: String): IO[Int] =
+        override def getRetryCount(runId: RunId, stepName: String): IO[Int] =
           counter.get
       }
       (counter, failure, updater)
